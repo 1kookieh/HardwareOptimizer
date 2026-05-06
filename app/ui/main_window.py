@@ -5,12 +5,9 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QResizeEvent
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -21,6 +18,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QStackedWidget,
     QStatusBar,
     QTabWidget,
     QTableWidget,
@@ -38,10 +36,14 @@ from app.reports import build_report_dict, export_html, export_json
 from app.storage import HistoryStore
 
 from .scan_worker import ScanWorker
+from .start_screen import StartScreen
 from .theme import DARK_QSS, LIGHT_QSS
+from .tokens import Color, Spacing
 
 
 COMPACT_BREAKPOINT = 960
+PAGE_START = 0
+PAGE_RESULTS = 1
 
 
 class MainWindow(QMainWindow):
@@ -59,23 +61,26 @@ class MainWindow(QMainWindow):
         self._dark = True
         self._compact = False
         self._scan_worker: ScanWorker | None = None
+        self._last_profile: str | None = None
+        self._last_games: list[str] = []
+        self._games_tab_index: int = -1
 
         self._build_ui()
         self._apply_theme()
 
-    # ---------- layout ----------
+    # ------------------------------------------------------------------ build
     def _build_ui(self) -> None:
-        central = QWidget()
-        self.setCentralWidget(central)
-        self._outer = QHBoxLayout(central)
-        self._outer.setContentsMargins(12, 12, 12, 12)
-        self._outer.setSpacing(12)
+        self.stack = QStackedWidget()
+        self.setCentralWidget(self.stack)
 
-        self._sidebar = self._build_sidebar()
-        self._main = self._build_main_area()
+        self.start_screen = StartScreen()
+        self.start_screen.startRequested.connect(self._on_start_requested)
+        self.stack.addWidget(self.start_screen)
 
-        self._outer.addWidget(self._sidebar, 0)
-        self._outer.addWidget(self._main, 1)
+        self.results_view = self._build_results_view()
+        self.stack.addWidget(self.results_view)
+
+        self.stack.setCurrentIndex(PAGE_START)
 
         self.setStatusBar(QStatusBar())
         self._progress_bar = QProgressBar()
@@ -85,84 +90,20 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._progress_bar)
         self.statusBar().showMessage("Pronto.")
 
-    def _build_sidebar(self) -> QWidget:
-        side = QWidget()
-        side.setObjectName("Sidebar")
-        side.setFixedWidth(320)
-        layout = QVBoxLayout(side)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+    def _build_results_view(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.MD)
+        layout.addLayout(self._build_top_bar())
 
-        header_row = QHBoxLayout()
-        title = QLabel("HardwareOptimizer")
-        title.setObjectName("Title")
-        header_row.addWidget(title)
-        header_row.addStretch(1)
-        self.theme_btn = QToolButton()
-        self.theme_btn.setText("☀")
-        self.theme_btn.setToolTip("Alternar tema claro/escuro")
-        self.theme_btn.clicked.connect(self._toggle_theme)
-        header_row.addWidget(self.theme_btn)
-        layout.addLayout(header_row)
-
-        subtitle = QLabel("Análise local · Sem alterações automáticas no sistema")
-        subtitle.setObjectName("Subtitle")
-        subtitle.setWordWrap(True)
-        layout.addWidget(subtitle)
-
-        layout.addWidget(QLabel("Perfil de otimização"))
-        self.profile_combo = QComboBox()
-        for key, prof in PROFILES.items():
-            self.profile_combo.addItem(prof.label, key)
-        self.profile_combo.currentIndexChanged.connect(self._on_profile_changed)
-        layout.addWidget(self.profile_combo)
-
-        self.games_group = QGroupBox("Jogos (perfil 'Jogos')")
-        gv = QVBoxLayout(self.games_group)
-        self.game_checks: dict[str, QCheckBox] = {}
-        for key, label in SUPPORTED_GAMES.items():
-            cb = QCheckBox(label)
-            cb.setEnabled(False)
-            self.game_checks[key] = cb
-            gv.addWidget(cb)
-        layout.addWidget(self.games_group)
-
-        self.scan_btn = QPushButton("Analisar computador")
-        self.scan_btn.setObjectName("Primary")
-        self.scan_btn.clicked.connect(self._on_scan_clicked)
-        layout.addWidget(self.scan_btn)
-
-        self.export_json_btn = QPushButton("Exportar relatório (JSON)")
-        self.export_json_btn.setEnabled(False)
-        self.export_json_btn.clicked.connect(lambda: self._on_export("json"))
-        layout.addWidget(self.export_json_btn)
-
-        self.export_html_btn = QPushButton("Exportar relatório (HTML)")
-        self.export_html_btn.setEnabled(False)
-        self.export_html_btn.clicked.connect(lambda: self._on_export("html"))
-        layout.addWidget(self.export_html_btn)
-
-        layout.addStretch(1)
-        notice = QLabel(
-            "A coleta usa modo de detecção máxima e somente leitura. O app lê "
-            "fontes locais e oficiais online, sem aplicar mudanças no sistema."
-        )
-        notice.setObjectName("Subtitle")
-        notice.setWordWrap(True)
-        layout.addWidget(notice)
-        return side
-
-    def _build_main_area(self) -> QWidget:
         self.tabs = QTabWidget()
-
         self.dashboard = QTextEdit(readOnly=True)
         self.dashboard.setPlainText(
-            "Bem-vindo ao HardwareOptimizer.\n\n"
-            "1. Selecione um perfil.\n"
-            "2. Se for 'Jogos', selecione os títulos.\n"
-            "3. Clique em 'Analisar computador'. A coleta é automática.\n"
-            "4. Revise evidências, fontes e recomendações.\n"
-            "5. Exporte o relatório em JSON ou HTML.\n"
+            "Análise concluída.\n\n"
+            "Use as abas para navegar por hardware, recomendações, BIOS/UEFI, "
+            "jogos, atualizações e histórico. Duplo clique numa recomendação "
+            "abre os detalhes; clique direito permite marcar status."
         )
         self.tabs.addTab(self.dashboard, "Dashboard")
 
@@ -176,7 +117,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.bios_table, "BIOS / UEFI")
 
         self.games_table = self._make_rec_table()
-        self.tabs.addTab(self.games_table, "Jogos")
+        self._games_tab_index = self.tabs.addTab(self.games_table, "Jogos")
 
         self.updates_text = QTextEdit(readOnly=True)
         self.tabs.addTab(self.updates_text, "Atualizações")
@@ -186,7 +127,42 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.history_list, "Histórico")
         self._refresh_history()
 
-        return self.tabs
+        layout.addWidget(self.tabs, 1)
+        return page
+
+    def _build_top_bar(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(Spacing.SM)
+
+        self.back_btn = QPushButton("← Nova análise")
+        self.back_btn.setCursor(Qt.PointingHandCursor)
+        self.back_btn.clicked.connect(self._go_to_start)
+        row.addWidget(self.back_btn)
+
+        self.profile_label = QLabel("")
+        self.profile_label.setStyleSheet(
+            f"color:{Color.MUTED};font-size:13px;padding-left:{Spacing.MD}px;"
+        )
+        row.addWidget(self.profile_label)
+
+        row.addStretch(1)
+
+        self.export_json_btn = QPushButton("Exportar JSON")
+        self.export_json_btn.setEnabled(False)
+        self.export_json_btn.clicked.connect(lambda: self._on_export("json"))
+        row.addWidget(self.export_json_btn)
+
+        self.export_html_btn = QPushButton("Exportar HTML")
+        self.export_html_btn.setEnabled(False)
+        self.export_html_btn.clicked.connect(lambda: self._on_export("html"))
+        row.addWidget(self.export_html_btn)
+
+        self.theme_btn = QToolButton()
+        self.theme_btn.setText("☀")
+        self.theme_btn.setToolTip("Alternar tema claro/escuro")
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        row.addWidget(self.theme_btn)
+        return row
 
     def _make_rec_table(self) -> QTableWidget:
         table = QTableWidget(0, 6)
@@ -202,10 +178,11 @@ class MainWindow(QMainWindow):
         table.customContextMenuRequested.connect(lambda pos, t=table: self._on_rec_context(t, pos))
         return table
 
-    # ---------- theme & layout responsiveness ----------
+    # --------------------------------------------------------------- theme
     def _apply_theme(self) -> None:
         self.setStyleSheet(DARK_QSS if self._dark else LIGHT_QSS)
-        self.theme_btn.setText("☀" if self._dark else "🌙")
+        if hasattr(self, "theme_btn"):
+            self.theme_btn.setText("☀" if self._dark else "🌙")
 
     def _toggle_theme(self) -> None:
         self._dark = not self._dark
@@ -213,37 +190,22 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
-        self._update_compact(event.size().width())
+        compact = event.size().width() < COMPACT_BREAKPOINT
+        if compact != self._compact:
+            self._compact = compact
+            self.statusBar().showMessage(
+                "Modo compacto ativo." if compact else "Pronto."
+            )
 
-    def _update_compact(self, width: int) -> None:
-        compact = width < COMPACT_BREAKPOINT
-        if compact == self._compact:
-            return
-        self._compact = compact
-        if compact:
-            self._sidebar.setFixedWidth(220)
-            self.statusBar().showMessage("Modo compacto ativo.")
-        else:
-            self._sidebar.setFixedWidth(320)
-            self.statusBar().showMessage("Pronto.")
-
-    # ---------- scan ----------
-    def _on_profile_changed(self) -> None:
-        is_games = self.profile_combo.currentData() == "games"
-        for cb in self.game_checks.values():
-            cb.setEnabled(is_games)
-            if not is_games:
-                cb.setChecked(False)
-
-    def _selected_games(self) -> list[str]:
-        return [k for k, cb in self.game_checks.items() if cb.isChecked()]
-
-    def _on_scan_clicked(self) -> None:
+    # --------------------------------------------------------------- scan
+    def _on_start_requested(self, profile: str, games: list[str]) -> None:
         if self._scan_worker is not None and self._scan_worker.isRunning():
             return
+        self._last_profile = profile
+        self._last_games = list(games)
 
-        self.scan_btn.setEnabled(False)
-        self.scan_btn.setText("Analisando…")
+        self.start_screen.set_running(True)
+        self.start_screen.set_status("Iniciando coleta…")
         self.statusBar().showMessage("Coletando dados do sistema… (somente leitura)")
         self._progress_bar.setValue(0)
         self._progress_bar.setVisible(True)
@@ -258,19 +220,20 @@ class MainWindow(QMainWindow):
 
     def _on_scan_progress(self, label: str, percent: int) -> None:
         self.statusBar().showMessage(f"Coletando: {label}…")
+        self.start_screen.set_status(f"{label} ({percent}%)")
         self._progress_bar.setValue(percent)
 
     def _on_scan_failed(self, message: str) -> None:
         self._progress_bar.setVisible(False)
+        self.start_screen.set_running(False)
+        self.start_screen.set_status("Falha na análise.")
         QMessageBox.critical(self, "Erro na análise", message)
-        self.scan_btn.setEnabled(True)
-        self.scan_btn.setText("Analisar computador")
         self._scan_worker = None
 
     def _on_scan_finished(self, scan: FullScan) -> None:
         try:
-            profile = self.profile_combo.currentData()
-            games = self._selected_games()
+            profile = self._last_profile or "general"
+            games = self._last_games
             recs = generate_recommendations(scan, profile, games)
             self._scan = scan
             self._recommendations = recs
@@ -287,20 +250,34 @@ class MainWindow(QMainWindow):
                 profile, games, scan.to_dict(), report["recommendations"]
             )
             self._refresh_history()
-            self.tabs.setCurrentIndex(2)
+
+            profile_label = PROFILES.get(profile).label if profile in PROFILES else profile
+            games_text = f" · jogos: {', '.join(SUPPORTED_GAMES.get(g, g) for g in games)}" if games else ""
+            self.profile_label.setText(f"Perfil: {profile_label}{games_text}")
+
             self.statusBar().showMessage(
                 f"Análise concluída. {len(recs)} recomendação(ões). "
                 f"Avisos de coleta: {len(scan.collection_errors)}."
             )
+            self.tabs.setCurrentIndex(2)
+            self.stack.setCurrentIndex(PAGE_RESULTS)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Erro ao processar resultado", str(exc))
         finally:
             self._progress_bar.setVisible(False)
-            self.scan_btn.setEnabled(True)
-            self.scan_btn.setText("Analisar computador")
+            self.start_screen.set_running(False)
+            self.start_screen.reset_status()
             self._scan_worker = None
 
-    # ---------- rendering ----------
+    def _go_to_start(self) -> None:
+        if self._scan_worker is not None and self._scan_worker.isRunning():
+            return
+        if self._last_profile:
+            self.start_screen.profile_picker.set_selected(self._last_profile)
+        self.stack.setCurrentIndex(PAGE_START)
+        self.statusBar().showMessage("Pronto.")
+
+    # ----------------------------------------------------------- rendering
     def _render_hardware(self, scan: FullScan) -> None:
         lines = ["Sistema", "-" * 40]
         for k, v in scan.system.to_dict().items():
@@ -358,20 +335,6 @@ class MainWindow(QMainWindow):
         else:
             lines.append(f"configurações detalhadas: {scan.bios.exposure_note}")
 
-        lines += ["", "Atualizações", "-" * 40]
-        for k, v in scan.updates.to_dict().items():
-            if k == "outdated_drivers":
-                continue
-            lines.append(f"{k}: {v}")
-        if scan.updates.outdated_drivers:
-            lines.append("drivers_antigos:")
-            for d in scan.updates.outdated_drivers[:10]:
-                row = d if isinstance(d, dict) else d.to_dict()
-                lines.append(
-                    f"- {row.get('device_name')} | {row.get('provider')} | "
-                    f"{row.get('version')} | {row.get('driver_date')}"
-                )
-
         if scan.collection_errors:
             lines += ["", "Avisos de coleta (não bloqueantes)", "-" * 40]
             lines += [f"- {e}" for e in scan.collection_errors]
@@ -425,11 +388,13 @@ class MainWindow(QMainWindow):
         self._fill_table(self.bios_table, bios_recs)
         self._fill_table(self.games_table, game_recs)
 
-        if not games:
-            self.tabs.setTabText(4, "Jogos")
-        else:
-            labels = ", ".join(SUPPORTED_GAMES.get(g, g) for g in games)
-            self.tabs.setTabText(4, f"Jogos ({labels[:30]}…)" if len(labels) > 30 else f"Jogos ({labels})")
+        if self._games_tab_index >= 0:
+            if not games:
+                self.tabs.setTabText(self._games_tab_index, "Jogos")
+            else:
+                labels = ", ".join(SUPPORTED_GAMES.get(g, g) for g in games)
+                title = f"Jogos ({labels})" if len(labels) <= 30 else f"Jogos ({labels[:30]}…)"
+                self.tabs.setTabText(self._games_tab_index, title)
 
     def _fill_table(self, table: QTableWidget, recs) -> None:
         table.setRowCount(len(recs))
@@ -459,7 +424,7 @@ class MainWindow(QMainWindow):
                     continue
                 table.setItem(row, 4, QTableWidgetItem(self._status_map.get(rec.title, "pending")))
 
-    # ---------- recommendation interactions ----------
+    # ---------------------------------------- recommendation interactions
     def _show_rec_details(self, table: QTableWidget, row: int) -> None:
         item = table.item(row, 0)
         if item is None:
@@ -504,13 +469,13 @@ class MainWindow(QMainWindow):
         self._refresh_status_cells()
         self.statusBar().showMessage(f"Status atualizado: {title} → {status}")
 
-    # ---------- export & history ----------
+    # ------------------------------------------------------ export & history
     def _on_export(self, fmt: str) -> None:
-        if not self._scan:
+        if not self._scan or not self._last_profile:
             return
-        profile = self.profile_combo.currentData()
-        games = self._selected_games()
-        report = build_report_dict(self._scan, profile, games, self._recommendations)
+        report = build_report_dict(
+            self._scan, self._last_profile, self._last_games, self._recommendations
+        )
         suffix = ".json" if fmt == "json" else ".html"
         path, _ = QFileDialog.getSaveFileName(
             self,

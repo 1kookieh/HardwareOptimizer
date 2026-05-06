@@ -8,7 +8,8 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 
 ## Status do MVP
 
-- Interface desktop em PySide6 com tema dark/light e layout compacto.
+- Interface desktop em PySide6 com tela inicial (botão circular animado de iniciar à esquerda, seleção de perfil em cartões à direita) e tela de resultados em abas. Tema dark/light alternável e layout compacto abaixo de 960px.
+- A lista de jogos aparece com slide-down animado apenas quando o perfil "Jogos" está selecionado.
 - Coleta read-only em modo de detecção máxima, sem UAC, prompts ou mudanças no sistema.
 - Coleta executada em thread separada (QThread) com barra de progresso por etapa: Sistema → Hardware → BIOS/UEFI → Atualizações locais → Fontes oficiais online. A janela permanece responsiva durante todo o processo.
 - Leitura de configurações detalhadas de BIOS quando o fabricante expõe via WMI.
