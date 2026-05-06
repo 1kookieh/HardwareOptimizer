@@ -134,6 +134,9 @@ Suíte rápida (default, com I/O mockado, < 1s):
 py -m pytest -q
 ```
 
+A configuração do pytest, ruff e mypy fica centralizada em `pyproject.toml`.
+O pytest usa `tool.pytest.ini_options` e pula testes de integração por padrão.
+
 Suíte de integração (toca WMI, PowerShell, registro e HTTP reais; 30–60s):
 
 ```powershell

@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hardware-optimizer"
+version = "0.1.0"
+description = "App desktop local-first para Windows que analisa hardware/sistema/BIOS e gera recomendações explicáveis."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "1kookieh" }]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Environment :: X11 Applications :: Qt",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["build", "dist", ".venv", "scripts/fix_mojibake.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "B",     # bugbear
+    "UP",    # pyupgrade
+    "C4",    # comprehensions
+    "SIM",   # simplify
+    "PL",    # pylint subset
+    "RUF",   # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (gerenciado pelo formatador)
+    "PLR0913", # too many arguments
+    "PLR2004", # magic value
+    "PLR0912", # too many branches
+    "PLR0915", # too many statements
+    "SIM108",  # ternário
+    "B008",    # default mutable não se aplica aqui
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004", "S101"]
+"app/ui/widgets/circular_button.py" = ["PLR0915"]
+"app/recommendations/bios.py" = ["PLR0915"]
+"app/collectors/system.py" = ["PLR0915", "PLR0912"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = false
+disallow_untyped_defs = false
+ignore_missing_imports = true
+files = ["app", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["wmi", "psutil", "winreg", "ctypes"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers -m \"not integration\""
+markers = [
+    "integration: testes que tocam o sistema real (WMI, PowerShell, registro, rede). Pulados por padrão. Rode com `pytest -m integration` para executá-los.",
+]
