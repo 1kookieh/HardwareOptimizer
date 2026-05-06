@@ -4,6 +4,8 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 
 > Importante: o app é advisory-first. Ele lê o máximo que o Windows, o firmware, ferramentas oficiais e fontes online oficiais expõem, mas nunca altera BIOS/UEFI, drivers, registro, overclock, undervolt, voltagem, frequência, fan curve ou power limit automaticamente.
 
+[![CI](https://github.com/1kookieh/HardwareOptimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/1kookieh/HardwareOptimizer/actions/workflows/ci.yml)
+
 ## Status do MVP
 
 - Interface desktop em PySide6 com tema dark/light e layout compacto.
