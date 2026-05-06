@@ -1,5 +1,8 @@
-PySide6>=6.6
-psutil>=5.9
-WMI>=1.5.1; sys_platform == "win32"
-pywin32>=306; sys_platform == "win32"
-pytest>=8.0
+# Runtime — versões pinadas para reprodutibilidade.
+# Para atualizar, ajustar com cuidado e rodar `py -m pytest -q` antes do commit.
+PySide6==6.11.0
+psutil==7.2.2
+
+# Windows-only (pip ignora silenciosamente em outros SOs por causa do marker).
+WMI==1.5.1; sys_platform == "win32"
+pywin32==311; sys_platform == "win32"

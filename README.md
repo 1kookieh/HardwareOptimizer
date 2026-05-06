@@ -107,6 +107,20 @@ py -m pip install -r requirements.txt
 py -m app.main
 ```
 
+## Instalação
+
+Runtime apenas:
+
+```powershell
+py -m pip install -r requirements.txt
+```
+
+Desenvolvimento (inclui pytest, ruff, mypy, pyinstaller):
+
+```powershell
+py -m pip install -r requirements-dev.txt
+```
+
 ## Testes
 
 Suíte rápida (default, com I/O mockado, < 1s):
