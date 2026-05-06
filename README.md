@@ -16,6 +16,7 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 - Leitura de configurações detalhadas de BIOS quando o fabricante expõe via WMI.
 - Consulta de fontes oficiais online para Windows Update, drivers e suporte/BIOS.
 - Estados vazios básicos em histórico e tabelas sem recomendações, evitando telas aparentemente quebradas.
+- Dashboard pós-análise com resumo, maior ponto de atenção, próxima ação segura e top 3 prioridades.
 - Engine determinística de recomendações por perfil.
 - Exportação de relatório JSON/HTML.
 - Histórico local em SQLite.

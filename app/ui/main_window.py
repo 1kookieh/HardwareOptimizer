@@ -323,6 +323,7 @@ class MainWindow(QMainWindow):
             self._recommendations = recs
             self._status_map = {r.title: "pending" for r in recs}
 
+            self._render_dashboard(scan, recs, profile, games)
             self._render_hardware(scan)
             self._render_recommendations(recs, games)
 
@@ -343,7 +344,7 @@ class MainWindow(QMainWindow):
                 f"Análise concluída. {len(recs)} recomendação(ões). "
                 f"Avisos de coleta: {len(scan.collection_errors)}."
             )
-            self.tabs.setCurrentIndex(2)
+            self.tabs.setCurrentIndex(0)
             self.stack.setCurrentIndex(PAGE_RESULTS)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Erro ao processar resultado", str(exc))
@@ -362,6 +363,59 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Pronto.")
 
     # ----------------------------------------------------------- rendering
+    def _render_dashboard(self, scan: FullScan, recs, profile: str, games: list[str]) -> None:
+        profile_label = PROFILES.get(profile).label if profile in PROFILES else profile
+        games_label = ", ".join(SUPPORTED_GAMES.get(g, g) for g in games) if games else "Nenhum"
+        risk_rank = {"blocked": 0, "risky": 1, "review": 2, "safe": 3}
+        highest_risk = min(recs, key=lambda rec: risk_rank.get(rec.risk.value, 99)) if recs else None
+        safe_next = next((rec for rec in recs if rec.risk.value in {"safe", "review"}), None)
+
+        lines = [
+            "Resumo da análise",
+            "-" * 40,
+            f"Perfil: {profile_label}",
+            f"Jogos selecionados: {games_label}",
+            f"Recomendações encontradas: {len(recs)}",
+            f"Avisos de coleta: {len(scan.collection_errors)}",
+            "",
+            "Maior atenção",
+            "-" * 40,
+        ]
+        if highest_risk:
+            lines.append(
+                f"{highest_risk.title} [{highest_risk.risk.value} / {highest_risk.priority.value}]"
+            )
+            lines.append(highest_risk.expected_benefit)
+        else:
+            lines.append("Nenhum risco relevante foi gerado pela engine.")
+
+        lines += ["", "Próxima ação segura", "-" * 40]
+        if safe_next:
+            lines.append(f"{safe_next.title} [{safe_next.priority.value}]")
+            lines.append(safe_next.how_to_validate or safe_next.expected_benefit)
+        else:
+            lines.append("Revise as recomendações sensíveis antes de qualquer mudança.")
+
+        lines += ["", "Top 3 prioridades", "-" * 40]
+        if recs:
+            for index, rec in enumerate(recs[:3], 1):
+                lines.append(f"{index}. {rec.title} [{rec.category.value} / {rec.priority.value}]")
+                lines.append(f"   {rec.expected_benefit}")
+        else:
+            lines.append("Nenhuma recomendação gerada.")
+
+        lines += [
+            "",
+            "Sinais rápidos",
+            "-" * 40,
+            f"Updates disponíveis: {scan.updates.available_windows_updates}",
+            f"Reinicialização pendente: {scan.updates.pending_reboot}",
+            f"Drivers antigos detectados: {len(scan.updates.outdated_drivers)}",
+            f"Secure Boot: {scan.bios.secure_boot}",
+            f"Virtualização: {scan.bios.virtualization}",
+        ]
+        self.dashboard.setPlainText("\n".join(lines))
+
     def _render_hardware(self, scan: FullScan) -> None:
         lines = ["Sistema", "-" * 40]
         for k, v in scan.system.to_dict().items():
