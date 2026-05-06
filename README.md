@@ -58,6 +58,10 @@ Jogos suportados no perfil Jogos: Valorant, League of Legends, Call of Duty / Wa
 
 Dados ausentes aparecem como "Não detectado automaticamente." Quando a BIOS não publica uma configuração para o Windows, o app mostra "Não exposto pelo firmware ou pelo sistema operacional." Isso é intencional: o app não inventa estado de BIOS, sensor, driver ou compatibilidade.
 
+### Fontes oficiais online
+
+O enriquecimento online só usa páginas oficiais. Quando o fabricante da placa-mãe ou da BIOS é reconhecido (ASUS, Gigabyte, MSI, ASRock, Biostar, EVGA, Lenovo, Dell, HP, Acer, Samsung, LG, Intel, AMI, Phoenix, Insyde, Supermicro, NZXT), o app aponta para a página oficial de suporte do vendor. Se o vendor não é reconhecido, o campo `bios_lookup_url` permanece como "Não detectado automaticamente." O app nunca cai em buscador externo (Google/Bing) para evitar vazamento de modelo da placa-mãe a terceiros.
+
 ## O que é recomendado
 
 | Categoria | Exemplos | Risco típico |

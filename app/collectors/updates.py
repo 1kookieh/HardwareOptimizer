@@ -5,7 +5,6 @@ import json
 import subprocess
 import sys
 from typing import Any
-from urllib.parse import quote_plus
 from urllib.request import Request, urlopen
 
 from app.models.hardware import UNDETECTED, BiosInfo, DriverInfo, HardwareInfo, UpdatesInfo
@@ -24,6 +23,43 @@ _DRIVER_CLASSES = {
     "hdc",
     "scsiadapter",
     "system",
+}
+
+# Mapa vendor -> página oficial de suporte. Apenas fabricantes com URL
+# canônica e estável. Quando o vendor não está aqui, bios_lookup_url
+# permanece em UNDETECTED — não fazemos fallback para buscador externo
+# para evitar vazar modelo da placa-mãe a terceiros.
+_BIOS_VENDOR_SUPPORT_URLS: dict[str, str] = {
+    "asus": "https://www.asus.com/support/",
+    "asustek": "https://www.asus.com/support/",
+    "asustek computer inc.": "https://www.asus.com/support/",
+    "gigabyte": "https://www.gigabyte.com/Support",
+    "gigabyte technology co., ltd.": "https://www.gigabyte.com/Support",
+    "msi": "https://www.msi.com/support",
+    "micro-star international co., ltd.": "https://www.msi.com/support",
+    "asrock": "https://www.asrock.com/support/index.asp",
+    "asrock inc.": "https://www.asrock.com/support/index.asp",
+    "biostar": "https://www.biostar.com.tw/app/en/support/",
+    "evga": "https://www.evga.com/support/download/",
+    "nzxt": "https://nzxt.com/support",
+    "supermicro": "https://www.supermicro.com/en/support",
+    "lenovo": "https://support.lenovo.com/",
+    "dell": "https://www.dell.com/support/home",
+    "dell inc.": "https://www.dell.com/support/home",
+    "hp": "https://support.hp.com/",
+    "hewlett-packard": "https://support.hp.com/",
+    "hewlett packard": "https://support.hp.com/",
+    "hp inc.": "https://support.hp.com/",
+    "acer": "https://www.acer.com/support",
+    "asus_notebook": "https://www.asus.com/support/",
+    "samsung": "https://www.samsung.com/support/",
+    "lg": "https://www.lg.com/support",
+    "intel": "https://www.intel.com/content/www/us/en/support/",
+    "intel corporation": "https://www.intel.com/content/www/us/en/support/",
+    "american megatrends": "https://www.ami.com/support/",
+    "american megatrends inc.": "https://www.ami.com/support/",
+    "phoenix technologies": "https://www.phoenix.com/support/",
+    "insyde corp.": "https://www.insyde.com/support",
 }
 
 
@@ -67,11 +103,10 @@ def enrich_online_update_sources(
             "https://www.intel.com/content/www/us/en/download-center/home.html"
         )
 
-    vendor = (hardware.motherboard_vendor or bios.vendor or "").strip()
-    model = (hardware.motherboard_model or "").strip()
-    if vendor or model:
-        query = quote_plus(f"{vendor} {model} BIOS support".strip())
-        info.bios_lookup_url = f"https://www.google.com/search?q={query}"
+    bios_url = _resolve_bios_support_url(hardware.motherboard_vendor, bios.vendor)
+    if bios_url:
+        info.bios_lookup_url = bios_url
+        sources.append(bios_url)
 
     info.official_sources = sorted(set(sources))
     reachable = []
@@ -82,6 +117,29 @@ def enrich_online_update_sources(
         info.online_check_status = f"{len(reachable)}/{len(info.official_sources)} fonte(s) oficial(is) acessível(is)."
     else:
         info.online_check_status = "Fontes oficiais não acessíveis nesta execução."
+
+
+def _resolve_bios_support_url(*candidates: str | None) -> str | None:
+    """Mapeia o nome do fabricante para a página oficial de suporte.
+
+    Aceita o vendor da placa-mãe e o vendor da BIOS como candidatos.
+    Faz match por substring para tolerar variações como
+    ``ASUSTeK COMPUTER INC.`` ou ``Gigabyte Technology Co., Ltd.``.
+    Retorna None quando nenhum vendor conhecido bate — neste caso o
+    chamador mantém ``UNDETECTED`` em vez de cair em buscador externo.
+    """
+    for candidate in candidates:
+        if not candidate:
+            continue
+        low = candidate.strip().lower()
+        if not low:
+            continue
+        if low in _BIOS_VENDOR_SUPPORT_URLS:
+            return _BIOS_VENDOR_SUPPORT_URLS[low]
+        for key, url in _BIOS_VENDOR_SUPPORT_URLS.items():
+            if key in low:
+                return url
+    return None
 
 
 def _url_reachable(url: str, errors: list[str]) -> bool:
