@@ -13,7 +13,7 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 - Engine determinística de recomendações por perfil.
 - Exportação de relatório JSON/HTML.
 - Histórico local em SQLite.
-- Testes automatizados para modelos, coleta, recomendações, segurança, relatórios, storage e detecções.
+- Testes automatizados para modelos, coleta, recomendações, segurança, relatórios, storage, detecções e regressão de encoding.
 
 ## Screenshots
 
