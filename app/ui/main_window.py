@@ -81,11 +81,14 @@ class MainWindow(QMainWindow):
 
         self.results_view = self._build_results_view()
         self.stack.addWidget(self.results_view)
+        self._apply_accessibility()
 
         self.stack.setCurrentIndex(PAGE_START)
 
         self.setStatusBar(QStatusBar())
         self._progress_bar = QProgressBar()
+        self._progress_bar.setAccessibleName("Progresso da análise")
+        self._progress_bar.setAccessibleDescription("Mostra o progresso da coleta por etapa.")
         self._progress_bar.setMaximumWidth(220)
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setVisible(False)
@@ -137,6 +140,8 @@ class MainWindow(QMainWindow):
         row.setSpacing(Spacing.SM)
 
         self.back_btn = QPushButton("← Nova análise")
+        self.back_btn.setAccessibleName("Nova análise")
+        self.back_btn.setAccessibleDescription("Volta para a tela inicial sem apagar o histórico salvo.")
         self.back_btn.setCursor(Qt.PointingHandCursor)
         self.back_btn.setToolTip("Voltar à tela inicial (Esc)")
         self.back_btn.clicked.connect(self._go_to_start)
@@ -151,18 +156,28 @@ class MainWindow(QMainWindow):
         row.addStretch(1)
 
         self.export_json_btn = QPushButton("Exportar JSON")
+        self.export_json_btn.setAccessibleName("Exportar relatório JSON")
+        self.export_json_btn.setAccessibleDescription(
+            "Exporta a última análise em arquivo JSON local."
+        )
         self.export_json_btn.setEnabled(False)
         self.export_json_btn.setToolTip("Exportar relatório em JSON (Ctrl+E)")
         self.export_json_btn.clicked.connect(lambda: self._on_export("json"))
         row.addWidget(self.export_json_btn)
 
         self.export_html_btn = QPushButton("Exportar HTML")
+        self.export_html_btn.setAccessibleName("Exportar relatório HTML")
+        self.export_html_btn.setAccessibleDescription(
+            "Exporta a última análise em relatório HTML local."
+        )
         self.export_html_btn.setEnabled(False)
         self.export_html_btn.setToolTip("Exportar relatório em HTML (Ctrl+Shift+E)")
         self.export_html_btn.clicked.connect(lambda: self._on_export("html"))
         row.addWidget(self.export_html_btn)
 
         self.theme_btn = QToolButton()
+        self.theme_btn.setAccessibleName("Alternar tema")
+        self.theme_btn.setAccessibleDescription("Alterna entre tema claro e escuro.")
         self.theme_btn.setText("☀")
         self.theme_btn.setToolTip("Alternar tema claro/escuro (Ctrl+T)")
         self.theme_btn.clicked.connect(self._toggle_theme)
@@ -182,6 +197,38 @@ class MainWindow(QMainWindow):
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(lambda pos, t=table: self._on_rec_context(t, pos))
         return table
+
+    def _apply_accessibility(self) -> None:
+        self.stack.setAccessibleName("Navegação principal")
+        self.stack.setAccessibleDescription("Alterna entre tela inicial e resultados da análise.")
+        self.results_view.setAccessibleName("Resultados da análise")
+        self.results_view.setAccessibleDescription(
+            "Área com dashboard, hardware, recomendações, BIOS, jogos, atualizações e histórico."
+        )
+        self.tabs.setAccessibleName("Abas de resultados")
+        self.tabs.setAccessibleDescription("Use as abas para navegar pelas seções do diagnóstico.")
+        self.dashboard.setAccessibleName("Dashboard da análise")
+        self.dashboard.setAccessibleDescription("Resumo inicial dos resultados da análise.")
+        self.hardware_text.setAccessibleName("Dados de hardware")
+        self.hardware_text.setAccessibleDescription("Lista dados detectados de sistema, hardware e BIOS.")
+        self.recs_table.setAccessibleName("Tabela de recomendações")
+        self.recs_table.setAccessibleDescription(
+            "Lista recomendações com categoria, prioridade, risco, status e resumo."
+        )
+        self.bios_table.setAccessibleName("Tabela de recomendações de BIOS e UEFI")
+        self.bios_table.setAccessibleDescription(
+            "Lista recomendações relacionadas a BIOS, UEFI e firmware."
+        )
+        self.games_table.setAccessibleName("Tabela de recomendações de jogos")
+        self.games_table.setAccessibleDescription(
+            "Lista recomendações específicas para jogos selecionados."
+        )
+        self.updates_text.setAccessibleName("Dados de atualizações")
+        self.updates_text.setAccessibleDescription(
+            "Mostra atualizações do Windows, fontes oficiais e drivers antigos detectados."
+        )
+        self.history_list.setAccessibleName("Histórico de análises")
+        self.history_list.setAccessibleDescription("Lista análises salvas localmente neste computador.")
 
     # ------------------------------------------------------ shortcuts
     def _wire_shortcuts(self) -> None:

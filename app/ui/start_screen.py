@@ -29,6 +29,10 @@ class StartScreen(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setAccessibleName("Tela inicial")
+        self.setAccessibleDescription(
+            "Tela para escolher perfil, jogos e iniciar a análise do computador."
+        )
         self.setStyleSheet(f"background-color:{Color.BACKGROUND};")
 
         outer = QHBoxLayout(self)

@@ -29,6 +29,10 @@ class GamesPanel(QFrame):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setAccessibleName("Seleção de jogos")
+        self.setAccessibleDescription(
+            "Selecione os jogos usados para priorizar recomendações do perfil Jogos."
+        )
         self.setObjectName("GamesPanel")
         self.setStyleSheet(
             f"#GamesPanel{{background-color:{Color.SURFACE};"
@@ -63,6 +67,10 @@ class GamesPanel(QFrame):
         self._checks: dict[str, QCheckBox] = {}
         for index, (key, label) in enumerate(SUPPORTED_GAMES.items()):
             cb = QCheckBox(label)
+            cb.setAccessibleName(f"Jogo {label}")
+            cb.setAccessibleDescription(
+                "Inclui este jogo na análise de recomendações para perfil Jogos."
+            )
             cb.toggled.connect(self._emit_selection)
             self._checks[key] = cb
             grid.addWidget(cb, index // 2, index % 2)

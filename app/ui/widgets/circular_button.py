@@ -35,6 +35,10 @@ class CircularStartButton(QAbstractButton):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setText("INICIAR")
+        self.setAccessibleName("Iniciar análise")
+        self.setAccessibleDescription(
+            "Executa a análise local do computador em modo somente leitura."
+        )
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMinimumSize(QSize(260, 260))

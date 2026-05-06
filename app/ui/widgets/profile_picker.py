@@ -38,6 +38,8 @@ class _ProfileCard(QPushButton):
         self.key = key
         self.accent = accent
         self.setCheckable(True)
+        self.setAccessibleName(f"Perfil {label}")
+        self.setAccessibleDescription(description)
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(64)
         self._label_text = label
@@ -54,6 +56,10 @@ class ProfilePicker(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setAccessibleName("Seletor de perfil de otimização")
+        self.setAccessibleDescription(
+            "Escolha o foco da análise para priorizar recomendações."
+        )
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
         self._cards: dict[str, _ProfileCard] = {}
