@@ -109,8 +109,22 @@ py -m app.main
 
 ## Testes
 
+Suíte rápida (default, com I/O mockado, < 1s):
+
 ```powershell
 py -m pytest -q
+```
+
+Suíte de integração (toca WMI, PowerShell, registro e HTTP reais; 30–60s):
+
+```powershell
+py -m pytest -m integration
+```
+
+Tudo (rápido + integração):
+
+```powershell
+py -m pytest -m "integration or not integration"
 ```
 
 Comandos opcionais quando configurados:
