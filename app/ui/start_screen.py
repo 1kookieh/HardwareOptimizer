@@ -77,6 +77,7 @@ class StartScreen(QWidget):
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setAlignment(Qt.AlignCenter)
         self.start_button = CircularStartButton()
+        self.start_button.setToolTip("Iniciar análise (F5 ou Ctrl+R)")
         self.start_button.clicked.connect(self._on_start_clicked)
         btn_layout.addWidget(self.start_button, 0, Qt.AlignCenter)
         layout.addWidget(btn_container, 0, Qt.AlignHCenter)

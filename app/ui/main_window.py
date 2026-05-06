@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QResizeEvent
+from PySide6.QtGui import QAction, QKeySequence, QResizeEvent, QShortcut
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -68,6 +68,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._apply_theme()
+        self._wire_shortcuts()
 
     # ------------------------------------------------------------------ build
     def _build_ui(self) -> None:
@@ -137,6 +138,7 @@ class MainWindow(QMainWindow):
 
         self.back_btn = QPushButton("← Nova análise")
         self.back_btn.setCursor(Qt.PointingHandCursor)
+        self.back_btn.setToolTip("Voltar à tela inicial (Esc)")
         self.back_btn.clicked.connect(self._go_to_start)
         row.addWidget(self.back_btn)
 
@@ -150,17 +152,19 @@ class MainWindow(QMainWindow):
 
         self.export_json_btn = QPushButton("Exportar JSON")
         self.export_json_btn.setEnabled(False)
+        self.export_json_btn.setToolTip("Exportar relatório em JSON (Ctrl+E)")
         self.export_json_btn.clicked.connect(lambda: self._on_export("json"))
         row.addWidget(self.export_json_btn)
 
         self.export_html_btn = QPushButton("Exportar HTML")
         self.export_html_btn.setEnabled(False)
+        self.export_html_btn.setToolTip("Exportar relatório em HTML (Ctrl+Shift+E)")
         self.export_html_btn.clicked.connect(lambda: self._on_export("html"))
         row.addWidget(self.export_html_btn)
 
         self.theme_btn = QToolButton()
         self.theme_btn.setText("☀")
-        self.theme_btn.setToolTip("Alternar tema claro/escuro")
+        self.theme_btn.setToolTip("Alternar tema claro/escuro (Ctrl+T)")
         self.theme_btn.clicked.connect(self._toggle_theme)
         row.addWidget(self.theme_btn)
         return row
@@ -178,6 +182,38 @@ class MainWindow(QMainWindow):
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(lambda pos, t=table: self._on_rec_context(t, pos))
         return table
+
+    # ------------------------------------------------------ shortcuts
+    def _wire_shortcuts(self) -> None:
+        # F5 ou Ctrl+R: dispara nova análise (na start screen)
+        for seq in ("F5", "Ctrl+R"):
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.activated.connect(self._shortcut_run_scan)
+
+        # Esc: voltar para start screen
+        sc_esc = QShortcut(QKeySequence("Escape"), self)
+        sc_esc.activated.connect(self._shortcut_back)
+
+        # Ctrl+T: alternar tema
+        sc_theme = QShortcut(QKeySequence("Ctrl+T"), self)
+        sc_theme.activated.connect(self._toggle_theme)
+
+        # Ctrl+E: exportar JSON
+        sc_export_json = QShortcut(QKeySequence("Ctrl+E"), self)
+        sc_export_json.activated.connect(lambda: self._on_export("json") if self._scan else None)
+
+        # Ctrl+Shift+E: exportar HTML
+        sc_export_html = QShortcut(QKeySequence("Ctrl+Shift+E"), self)
+        sc_export_html.activated.connect(lambda: self._on_export("html") if self._scan else None)
+
+    def _shortcut_run_scan(self) -> None:
+        if self.stack.currentIndex() != PAGE_START:
+            return
+        self.start_screen._on_start_clicked()
+
+    def _shortcut_back(self) -> None:
+        if self.stack.currentIndex() == PAGE_RESULTS:
+            self._go_to_start()
 
     # --------------------------------------------------------------- theme
     def _apply_theme(self) -> None:
