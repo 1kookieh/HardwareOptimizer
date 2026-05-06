@@ -52,8 +52,8 @@ def test_no_promise_of_exact_fps():
 
 
 def test_bios_update_only_when_unknown_or_with_caution():
-    scan = make_scan(motherboard_model="Não detectado automaticamente — requer confirmação manual.",
-                     bios_version="Não detectado automaticamente — requer confirmação manual.")
+    scan = make_scan(motherboard_model="Não detectado automaticamente.",
+                     bios_version="Não detectado automaticamente.")
     recs = generate_recommendations(scan, "general")
     bios_update = [r for r in recs if "Atualização" in r.title]
     assert bios_update
@@ -69,10 +69,10 @@ def test_recommendations_sorted_by_priority():
     assert ranks == sorted(ranks)
 
 
-def test_missing_data_marked_as_manual():
+def test_missing_data_does_not_force_manual_verification_for_safe_recommendations():
     scan = make_scan()
-    scan.bios.virtualization = "Não detectado automaticamente — requer confirmação manual."
+    scan.bios.virtualization = "Não detectado automaticamente."
     recs = generate_recommendations(scan, "development")
     for r in recs:
-        if r.current_state.startswith("Não detectado"):
-            assert r.manual_confirmation_required is True
+        if r.current_state.startswith("Não detectado") and r.risk.value == "safe":
+            assert r.manual_confirmation_required is False

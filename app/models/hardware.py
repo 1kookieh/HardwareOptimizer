@@ -1,7 +1,8 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
-UNDETECTED = "Não detectado automaticamente — requer confirmação manual."
+UNDETECTED = "Não detectado automaticamente."
+UNEXPOSED = "Não exposto pelo firmware ou pelo sistema operacional."
 
 
 @dataclass
@@ -21,6 +22,9 @@ class BiosInfo:
     fast_startup: str = UNDETECTED
     hibernation: str = UNDETECTED
     cpu_vendor: str = UNDETECTED
+    firmware_tables: list[str] = field(default_factory=list)
+    exposed_settings: dict[str, str] = field(default_factory=dict)
+    exposure_note: str = UNEXPOSED
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,7 +78,9 @@ class HardwareInfo:
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["ram_modules"] = [m if isinstance(m, dict) else m.to_dict() for m in d["ram_modules"]]
+        d["ram_modules"] = [
+            m if isinstance(m, dict) else m.to_dict() for m in d["ram_modules"]
+        ]
         return d
 
 
@@ -86,7 +92,6 @@ class SystemInfo:
     architecture: str = UNDETECTED
     hostname: str = UNDETECTED
     power_plan: str = UNDETECTED
-
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -102,6 +107,10 @@ class UpdatesInfo:
     update_check_status: str = UNDETECTED
     outdated_drivers: list[DriverInfo] = field(default_factory=list)
     drivers_total: Optional[int] = None
+    online_check_status: str = UNDETECTED
+    official_sources: list[str] = field(default_factory=list)
+    driver_lookup_urls: dict[str, str] = field(default_factory=dict)
+    bios_lookup_url: str = UNDETECTED
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -119,6 +128,7 @@ class FullScan:
     updates: UpdatesInfo = field(default_factory=UpdatesInfo)
     collected_at: str = ""
     collection_errors: list[str] = field(default_factory=list)
+    detection_sources: dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -128,4 +138,7 @@ class FullScan:
             "updates": self.updates.to_dict(),
             "collected_at": self.collected_at,
             "collection_errors": list(self.collection_errors),
+            "detection_sources": {
+                key: list(values) for key, values in self.detection_sources.items()
+            },
         }

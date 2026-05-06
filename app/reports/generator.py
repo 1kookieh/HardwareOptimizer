@@ -50,6 +50,9 @@ def build_report_dict(
         "bios": scan.bios.to_dict(),
         "updates": scan.updates.to_dict(),
         "collection_errors": list(scan.collection_errors),
+        "detection_sources": {
+            key: list(values) for key, values in scan.detection_sources.items()
+        },
         "recommendations": [r.to_dict() for r in recommendations],
         "summary": _build_summary(recommendations),
         "checklists": {
@@ -59,7 +62,8 @@ def build_report_dict(
         "safety_notice": (
             "Este aplicativo é advisory-first. Nenhuma alteração de BIOS/UEFI, "
             "overclock, undervolt, registro ou driver é aplicada automaticamente. "
-            "Toda recomendação sensível exige confirmação manual do usuário."
+            "Quando o firmware não expõe uma configuração, o relatório marca "
+            "o dado como não exposto em vez de estimar."
         ),
     }
 
@@ -113,6 +117,10 @@ def _render_html(report: dict[str, Any]) -> str:
         f"<tr><th>{esc(str(k))}</th><td>{esc(str(v))}</td></tr>"
         for k, v in report.get("updates", {}).items()
         if k != "outdated_drivers"
+    )
+    source_rows = "".join(
+        f"<tr><th>{esc(str(k))}</th><td>{esc(', '.join(v))}</td></tr>"
+        for k, v in report.get("detection_sources", {}).items()
     )
     rec_blocks = []
     for rec in report["recommendations"]:
@@ -175,6 +183,7 @@ def _render_html(report: dict[str, Any]) -> str:
 <h2>Hardware</h2><table>{hw_rows}</table>
 <h2>BIOS</h2><table>{bios_rows}</table>
 <h2>Atualizações</h2><table>{updates_rows}</table>
+<h2>Fontes de detecção</h2><table>{source_rows}</table>
 <h2>Recomendações ({report['summary']['total']})</h2>
 {''.join(rec_blocks) or '<p>Sem recomendações.</p>'}
 <h2>Checklist — antes de alterar BIOS/UEFI</h2><ul>{pre}</ul>

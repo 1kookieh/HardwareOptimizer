@@ -45,6 +45,23 @@ def test_device_guard_parser_detects_vbs_and_hvci():
     assert hvci is True
 
 
+def test_vendor_bios_setting_parser_filters_sensitive_names():
+    from app.collectors.system import _parse_lenovo_bios_settings
+
+    settings = _parse_lenovo_bios_settings([
+        "SecureBoot,Enabled",
+        "AssetTag,PRIVATE",
+        "WakeOnLAN,Disabled",
+    ])
+    assert settings == {"SecureBoot": "Enabled", "WakeOnLAN": "Disabled"}
+
+
+def test_scan_fixture_contains_exposed_bios_settings_and_sources():
+    scan = make_scan()
+    assert scan.bios.exposed_settings["SecureBoot"] == "Habilitado"
+    assert "bios" in scan.detection_sources
+
+
 def test_hvci_recommendation_is_risky_tradeoff_for_games():
     scan = make_scan(hvci_running="Habilitado", vbs_running="Habilitado")
     recs = generate_recommendations(scan, "games", games=["valorant"])
@@ -57,5 +74,5 @@ def test_fast_startup_recommendation_only_for_stability_profile():
     scan = make_scan(fast_startup="Habilitado")
     stability = generate_recommendations(scan, "stability")
     general = generate_recommendations(scan, "general")
-    assert any("Rápida" in r.title or "RÃ¡pida" in r.title for r in stability)
-    assert not any("Rápida" in r.title or "RÃ¡pida" in r.title for r in general)
+    assert any("Rápida" in r.title or "Rápida" in r.title for r in stability)
+    assert not any("Rápida" in r.title or "Rápida" in r.title for r in general)

@@ -5,8 +5,10 @@ import json
 import subprocess
 import sys
 from typing import Any
+from urllib.parse import quote_plus
+from urllib.request import Request, urlopen
 
-from app.models.hardware import UNDETECTED, DriverInfo, UpdatesInfo
+from app.models.hardware import UNDETECTED, BiosInfo, DriverInfo, HardwareInfo, UpdatesInfo
 
 
 _REBOOT_REGISTRY_PATHS = [
@@ -28,7 +30,7 @@ _DRIVER_CLASSES = {
 def collect_updates(errors: list[str]) -> UpdatesInfo:
     info = UpdatesInfo()
     if sys.platform != "win32":
-        info.update_check_status = "NÃ£o executado fora do Windows."
+        info.update_check_status = "Não executado fora do Windows."
         return info
 
     info.pending_reboot = _collect_pending_reboot(errors)
@@ -36,6 +38,60 @@ def collect_updates(errors: list[str]) -> UpdatesInfo:
     _collect_available_windows_updates(info, errors)
     _collect_outdated_drivers(info, errors)
     return info
+
+
+def enrich_online_update_sources(
+    info: UpdatesInfo,
+    hardware: HardwareInfo,
+    bios: BiosInfo,
+    errors: list[str],
+) -> None:
+    sources = [
+        "https://www.catalog.update.microsoft.com/Home.aspx",
+        "https://www.microsoft.com/software-download/windows11",
+    ]
+    gpu = (hardware.gpu_name or "").lower()
+    if "nvidia" in gpu:
+        sources.append("https://www.nvidia.com/Download/index.aspx")
+        info.driver_lookup_urls["gpu"] = (
+            "https://www.nvidia.com/Download/index.aspx?lang=en-us"
+        )
+    elif "amd" in gpu or "radeon" in gpu:
+        sources.append("https://www.amd.com/en/support/download/drivers.html")
+        info.driver_lookup_urls["gpu"] = (
+            "https://www.amd.com/en/support/download/drivers.html"
+        )
+    elif "intel" in gpu:
+        sources.append("https://www.intel.com/content/www/us/en/download-center/home.html")
+        info.driver_lookup_urls["gpu"] = (
+            "https://www.intel.com/content/www/us/en/download-center/home.html"
+        )
+
+    vendor = (hardware.motherboard_vendor or bios.vendor or "").strip()
+    model = (hardware.motherboard_model or "").strip()
+    if vendor or model:
+        query = quote_plus(f"{vendor} {model} BIOS support".strip())
+        info.bios_lookup_url = f"https://www.google.com/search?q={query}"
+
+    info.official_sources = sorted(set(sources))
+    reachable = []
+    for url in info.official_sources:
+        if _url_reachable(url, errors):
+            reachable.append(url)
+    if reachable:
+        info.online_check_status = f"{len(reachable)}/{len(info.official_sources)} fonte(s) oficial(is) acessível(is)."
+    else:
+        info.online_check_status = "Fontes oficiais não acessíveis nesta execução."
+
+
+def _url_reachable(url: str, errors: list[str]) -> bool:
+    try:
+        req = Request(url, headers={"User-Agent": "HardwareOptimizer/1.0"})
+        with urlopen(req, timeout=3) as response:
+            return 200 <= int(response.status) < 400
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"online_source {url}: {exc}")
+        return False
 
 
 def _collect_pending_reboot(errors: list[str]) -> bool | None:
@@ -104,14 +160,14 @@ def _collect_available_windows_updates(info: UpdatesInfo, errors: list[str]) -> 
         timeout=70,
     )
     if text is None:
-        info.update_check_status = "Falhou ou indisponÃ­vel."
+        info.update_check_status = "Falhou ou indisponível."
         return
     try:
         info.available_windows_updates = int(text.strip().splitlines()[-1])
-        info.update_check_status = "ConcluÃ­do."
+        info.update_check_status = "Concluído."
     except (TypeError, ValueError, IndexError) as exc:
         errors.append(f"available_windows_updates_parse: {exc}")
-        info.update_check_status = "Resultado nÃ£o interpretado."
+        info.update_check_status = "Resultado não interpretado."
 
 
 def _collect_outdated_drivers(info: UpdatesInfo, errors: list[str]) -> None:

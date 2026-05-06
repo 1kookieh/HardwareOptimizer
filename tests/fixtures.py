@@ -82,6 +82,9 @@ def make_scan(
         fast_startup=fast_startup,
         hibernation="Habilitado",
         cpu_vendor=cpu_vendor,
+        firmware_tables=["Raw SMBIOS", "ACPI"],
+        exposed_settings={"SecureBoot": secure_boot, "Virtualization": virtualization},
+        exposure_note="Configurações de BIOS expostas por interface WMI do fabricante foram lidas.",
     )
     updates = UpdatesInfo(
         pending_reboot=pending_reboot,
@@ -92,6 +95,13 @@ def make_scan(
         update_check_status="Concluído.",
         outdated_drivers=outdated_drivers or [],
         drivers_total=12,
+        online_check_status="2/2 fonte(s) oficial(is) acessível(is).",
+        official_sources=[
+            "https://www.catalog.update.microsoft.com/Home.aspx",
+            "https://www.nvidia.com/Download/index.aspx",
+        ],
+        driver_lookup_urls={"gpu": "https://www.nvidia.com/Download/index.aspx?lang=en-us"},
+        bios_lookup_url="https://www.google.com/search?q=GIGABYTE+B650+AORUS+ELITE+AX+BIOS+support",
     )
     return FullScan(
         system=sys_info,
@@ -99,4 +109,5 @@ def make_scan(
         bios=bios,
         updates=updates,
         collected_at="2026-05-06T12:00:00",
+        detection_sources={"bios": ["vendor BIOS WMI quando exposto"]},
     )

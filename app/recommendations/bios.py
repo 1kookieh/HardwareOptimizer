@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from app.models.hardware import UNDETECTED, FullScan
+from app.models.hardware import UNDETECTED, UNEXPOSED, FullScan
 from app.models.recommendation import Category, Priority, Recommendation, RiskLevel
 
 
 def _detected(value: str | None) -> bool:
-    return bool(value) and value != UNDETECTED
+    return bool(value) and value not in {UNDETECTED, UNEXPOSED}
 
 
 def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recommendation]:
     recs: list[Recommendation] = []
     bios = scan.bios
 
-    xmp_state = "Não detectado automaticamente — requer confirmação manual."
+    xmp_state = UNEXPOSED
     if scan.hardware.ram_xmp_active is True:
         xmp_state = "Provavelmente ativo (frequência acima de JEDEC detectada)."
     elif scan.hardware.ram_xmp_active is False:
@@ -52,7 +52,7 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
         )
     )
 
-    rebar_state = "Não detectado automaticamente — requer confirmação manual."
+    rebar_state = UNEXPOSED
     if scan.hardware.rebar_enabled is True:
         rebar_state = "Habilitado (detectado)."
     elif scan.hardware.rebar_enabled is False:
@@ -150,19 +150,19 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
                     "jogos e anti-cheats."
                 ),
                 current_state="Memory Integrity / HVCI detectado como habilitado.",
-                recommended_state="Manter habilitado por padrÃ£o; considerar desabilitar somente se houver perda real medida.",
-                expected_benefit="Pode reduzir overhead em alguns cenÃ¡rios competitivos, sem ganho garantido.",
-                expected_impact="Desabilitar reduz uma camada de seguranÃ§a do Windows.",
-                when_not_to_apply="PC usado para trabalho sensÃ­vel, bancos, dados corporativos ou quando seguranÃ§a Ã© prioridade.",
-                how_to_validate="Medir frametime antes/depois no mesmo jogo e restaurar se nÃ£o houver benefÃ­cio claro.",
-                safety_note="Trade-off de seguranÃ§a. O app nunca muda essa configuraÃ§Ã£o automaticamente.",
+                recommended_state="Manter habilitado por padrão; considerar desabilitar somente se houver perda real medida.",
+                expected_benefit="Pode reduzir overhead em alguns cenários competitivos, sem ganho garantido.",
+                expected_impact="Desabilitar reduz uma camada de segurança do Windows.",
+                when_not_to_apply="PC usado para trabalho sensível, bancos, dados corporativos ou quando segurança é prioridade.",
+                how_to_validate="Medir frametime antes/depois no mesmo jogo e restaurar se não houver benefício claro.",
+                safety_note="Trade-off de segurança. O app nunca muda essa configuração automaticamente.",
                 confidence="medium",
                 evidence=[f"bios.hvci_running={bios.hvci_running}", f"bios.vbs_running={bios.vbs_running}"],
                 manual_steps=[
-                    "Criar ponto de restauraÃ§Ã£o.",
-                    "Abrir SeguranÃ§a do Windows > SeguranÃ§a do dispositivo > Isolamento do nÃºcleo.",
-                    "Alterar Memory Integrity apenas se vocÃª aceitar o trade-off.",
-                    "Reiniciar e validar seguranÃ§a/desempenho.",
+                    "Criar ponto de restauração.",
+                    "Abrir Segurança do Windows > Segurança do dispositivo > Isolamento do núcleo.",
+                    "Alterar Memory Integrity apenas se você aceitar o trade-off.",
+                    "Reiniciar e validar segurança/desempenho.",
                 ],
                 rollback="Reativar Memory Integrity e reiniciar.",
             )
@@ -171,18 +171,18 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
     if bios.storage_mode.lower().startswith("raid"):
         recs.append(
             Recommendation(
-                title="Confirmar se modo RAID Ã© necessÃ¡rio",
+                title="Confirmar se modo RAID é necessário",
                 category=Category.BIOS,
                 priority=Priority.LOW,
                 risk=RiskLevel.RISKY,
-                rationale="Muitos PCs usam AHCI para SSDs comuns; RAID sem necessidade pode complicar drivers e migraÃ§Ãµes.",
+                rationale="Muitos PCs usam AHCI para SSDs comuns; RAID sem necessidade pode complicar drivers e migrações.",
                 current_state=f"Modo de armazenamento detectado: {bios.storage_mode}.",
-                recommended_state="Manter RAID se houver array/Intel RST/AMD RAIDXpert em uso; considerar AHCI apenas com migraÃ§Ã£o planejada.",
-                expected_benefit="Pode simplificar compatibilidade de storage quando RAID nÃ£o Ã© usado.",
+                recommended_state="Manter RAID se houver array/Intel RST/AMD RAIDXpert em uso; considerar AHCI apenas com migração planejada.",
+                expected_benefit="Pode simplificar compatibilidade de storage quando RAID não é usado.",
                 expected_impact="Trocar RAID/AHCI sem preparo pode impedir o boot do Windows.",
-                when_not_to_apply="Quando hÃ¡ volume RAID real, Optane/RST, BitLocker sem preparo ou sistema corporativo.",
-                how_to_validate="Confirmar no Gerenciador de Dispositivos e na BIOS antes de qualquer mudanÃ§a.",
-                safety_note="AlteraÃ§Ã£o sensÃ­vel de BIOS/storage; requer backup e plano de migraÃ§Ã£o.",
+                when_not_to_apply="Quando há volume RAID real, Optane/RST, BitLocker sem preparo ou sistema corporativo.",
+                how_to_validate="Confirmar no Gerenciador de Dispositivos e na BIOS antes de qualquer mudança.",
+                safety_note="Alteração sensível de BIOS/storage; requer backup e plano de migração.",
                 confidence="low",
                 evidence=[f"bios.storage_mode={bios.storage_mode}"],
                 manual_steps=[
@@ -191,33 +191,33 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
                     "Pesquisar procedimento oficial para migrar RAID/AHCI no Windows.",
                     "Alterar somente se houver motivo claro.",
                 ],
-                rollback="Voltar ao modo anterior na BIOS se o Windows nÃ£o inicializar.",
+                rollback="Voltar ao modo anterior na BIOS se o Windows não inicializar.",
             )
         )
 
     if bios.fast_startup.lower().startswith("habilitado") and profile_key == "stability":
         recs.append(
             Recommendation(
-                title="Desabilitar InicializaÃ§Ã£o RÃ¡pida para estabilidade",
+                title="Desabilitar Inicialização Rápida para estabilidade",
                 category=Category.WINDOWS,
                 priority=Priority.MEDIUM,
                 risk=RiskLevel.SAFE,
-                rationale="Fast Startup pode preservar estado de kernel/driver e mascarar problemas apÃ³s updates.",
-                current_state="InicializaÃ§Ã£o RÃ¡pida habilitada.",
+                rationale="Fast Startup pode preservar estado de kernel/driver e mascarar problemas após updates.",
+                current_state="Inicialização Rápida habilitada.",
                 recommended_state="Desabilitada em perfil de estabilidade ou dual-boot.",
-                expected_benefit="Pode reduzir inconsistÃªncias apÃ³s updates, troca de driver ou dual-boot.",
+                expected_benefit="Pode reduzir inconsistências após updates, troca de driver ou dual-boot.",
                 expected_impact="Boot frio pode ficar um pouco mais lento.",
-                when_not_to_apply="Quando o tempo de boot Ã© prioridade e nÃ£o hÃ¡ problemas de estabilidade.",
+                when_not_to_apply="Quando o tempo de boot é prioridade e não há problemas de estabilidade.",
                 how_to_validate="Desligar totalmente, ligar novamente e testar dispositivos/drivers.",
-                safety_note="ConfiguraÃ§Ã£o reversÃ­vel do Windows; nÃ£o mexe em BIOS.",
+                safety_note="Configuração reversível do Windows; não mexe em BIOS.",
                 confidence="medium",
                 evidence=[f"bios.fast_startup={bios.fast_startup}", f"bios.hibernation={bios.hibernation}"],
                 manual_steps=[
-                    "Abrir OpÃ§Ãµes de Energia.",
-                    "Alterar configuraÃ§Ãµes dos botÃµes de energia.",
-                    "Desmarcar 'Ligar inicializaÃ§Ã£o rÃ¡pida'.",
+                    "Abrir Opções de Energia.",
+                    "Alterar configurações dos botões de energia.",
+                    "Desmarcar 'Ligar inicialização rápida'.",
                 ],
-                rollback="Reabilitar a opÃ§Ã£o no mesmo painel.",
+                rollback="Reabilitar a opção no mesmo painel.",
             )
         )
 
@@ -230,18 +230,18 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
                 category=Category.BIOS,
                 priority=Priority.LOW,
                 risk=RiskLevel.REVIEW,
-                rationale="Boost automÃ¡tico da CPU costuma ser mais seguro que OC manual para uso geral e jogos.",
+                rationale="Boost automático da CPU costuma ser mais seguro que OC manual para uso geral e jogos.",
                 current_state=f"Fabricante da CPU: {bios.cpu_vendor}.",
                 recommended_state=(
-                    "AMD: PBO em Auto/Enabled conservador se houver refrigeraÃ§Ã£o adequada."
+                    "AMD: PBO em Auto/Enabled conservador se houver refrigeração adequada."
                     if is_amd
-                    else "Intel: Turbo Boost habilitado e limites de energia coerentes com refrigeraÃ§Ã£o/placa-mÃ£e."
+                    else "Intel: Turbo Boost habilitado e limites de energia coerentes com refrigeração/placa-mãe."
                 ),
                 expected_benefit="Pode manter desempenho esperado sem prometer ganhos ou exigir overclock manual.",
                 expected_impact="Mais boost pode elevar consumo e temperatura.",
-                when_not_to_apply="Temperaturas altas, fonte/refrigeraÃ§Ã£o insuficiente ou prioridade em baixo consumo.",
+                when_not_to_apply="Temperaturas altas, fonte/refrigeração insuficiente ou prioridade em baixo consumo.",
                 how_to_validate="Monitorar clocks, temperatura e estabilidade em carga real.",
-                safety_note="NÃ£o fazer OC/UV automÃ¡tico; qualquer ajuste Ã© manual e conservador.",
+                safety_note="Não fazer OC/UV automático; qualquer ajuste é manual e conservador.",
                 confidence="medium",
                 evidence=[f"bios.cpu_vendor={bios.cpu_vendor}"],
                 rollback="Voltar BIOS para Auto/Defaults se houver instabilidade.",
@@ -251,7 +251,7 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
     if not (_detected(scan.hardware.motherboard_model) and _detected(bios.version)):
         recs.append(
             Recommendation(
-                title="Atualização de BIOS — somente após identificação manual",
+                title="Atualização de BIOS — bloqueada até identificação automática confiável",
                 category=Category.BIOS,
                 priority=Priority.LOW,
                 risk=RiskLevel.RISKY,
@@ -260,7 +260,7 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
                     "incompatibilidade ou brick."
                 ),
                 current_state=f"Placa: {scan.hardware.motherboard_model} — BIOS: {bios.version}",
-                recommended_state="Verificar manualmente o modelo e a versão antes de qualquer atualização.",
+                recommended_state="Detectar modelo exato e versão atual antes de qualquer atualização.",
                 expected_benefit="Atualização só deve ser feita se houver fix relevante para o seu hardware.",
                 expected_impact="Risco de brick em caso de erro durante o flash.",
                 when_not_to_apply=(
@@ -268,7 +268,7 @@ def build_bios_recommendations(scan: FullScan, profile_key: str) -> list[Recomme
                     "nunca fazer downgrade."
                 ),
                 how_to_validate="Conferir versão atual em `msinfo32` e a mais recente no site do fabricante.",
-                safety_note="Não recomendamos atualização automática de BIOS. Sempre manual.",
+                safety_note="O app não atualiza BIOS automaticamente e não recomenda downgrade.",
                 confidence="low",
                 manual_steps=[
                     "Identificar modelo exato da placa-mãe (placa, não apenas chipset).",

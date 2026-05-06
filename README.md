@@ -2,12 +2,14 @@
 
 HardwareOptimizer é um app desktop local-first para Windows que analisa hardware, sistema, BIOS/UEFI, drivers e updates para gerar recomendações explicáveis de otimização, estabilidade e segurança.
 
-> Importante: o app é advisory-first. Ele nunca altera BIOS/UEFI, drivers, registro, overclock, undervolt, voltagem, frequência, fan curve ou power limit automaticamente. Toda recomendação sensível é manual, conservadora, classificada por risco e acompanhada de validação/rollback quando aplicável.
+> Importante: o app é advisory-first. Ele lê o máximo que o Windows, o firmware, ferramentas oficiais e fontes online oficiais expõem, mas nunca altera BIOS/UEFI, drivers, registro, overclock, undervolt, voltagem, frequência, fan curve ou power limit automaticamente.
 
 ## Status do MVP
 
 - Interface desktop em PySide6 com tema dark/light e layout compacto.
-- Coleta read-only sem UAC, prompts ou mudanças no sistema.
+- Coleta read-only em modo de detecção máxima, sem UAC, prompts ou mudanças no sistema.
+- Leitura de configurações detalhadas de BIOS quando o fabricante expõe via WMI.
+- Consulta de fontes oficiais online para Windows Update, drivers e suporte/BIOS.
 - Engine determinística de recomendações por perfil.
 - Exportação de relatório JSON/HTML.
 - Histórico local em SQLite.
@@ -47,12 +49,14 @@ Jogos suportados no perfil Jogos: Valorant, League of Legends, Call of Duty / Wa
 | Placa-mãe | Fabricante e modelo | WMI `Win32_BaseBoard` |
 | Armazenamento | Partições, filesystem, total/usado e modo AHCI/RAID quando detectável | `psutil`, PowerShell/WMI |
 | BIOS/UEFI | Fabricante, versão, data, Secure Boot, TPM, TPM version, virtualização, boot mode | WMI, `Confirm-SecureBootUEFI`, `Get-Tpm`, `Get-ComputerInfo` |
+| BIOS detalhada | Configurações expostas pelo fabricante, como Secure Boot, virtualization, boot, power e outros nomes publicados via WMI | Lenovo `root\wmi`, HP `root\hp\instrumentedBIOS`, Dell `root\dcim\sysman` |
+| Firmware | Presença de tabelas Raw SMBIOS, ACPI e Firmware expostas ao Windows | `EnumSystemFirmwareTables` |
 | Segurança/virtualização | Hyper-V, VBS e HVCI/Memory Integrity | `Get-WindowsOptionalFeature`, WMI `root\Microsoft\Windows\DeviceGuard` |
 | Energia/boot | Fast Startup e hibernação | Registro Windows, `powercfg /a` |
 | Sensores | Temperatura/clock/voltagem quando disponível | WMI `root\LibreHardwareMonitor` |
 | Updates | Reboot pendente, último hotfix, updates disponíveis e drivers antigos | Registro, `Get-HotFix`, COM `Microsoft.Update.Session`, WMI `Win32_PnPSignedDriver` |
 
-Dados ausentes aparecem como "Não detectado automaticamente - requer confirmação manual." Isso é intencional: o app não inventa estado de BIOS, sensor, driver ou compatibilidade.
+Dados ausentes aparecem como "Não detectado automaticamente." Quando a BIOS não publica uma configuração para o Windows, o app mostra "Não exposto pelo firmware ou pelo sistema operacional." Isso é intencional: o app não inventa estado de BIOS, sensor, driver ou compatibilidade.
 
 ## O que é recomendado
 
@@ -68,7 +72,7 @@ Dados ausentes aparecem como "Não detectado automaticamente - requer confirmaç
 
 Cada recomendação inclui título, categoria, prioridade, risco, justificativa, estado atual, estado recomendado, benefício esperado, impacto, quando não aplicar, validação, nota de segurança, passos manuais, evidência, rollback, confiança e confirmação manual quando necessário.
 
-## Como funciona a checagem de updates
+## Como funciona a checagem de updates e internet
 
 A checagem é somente leitura:
 
@@ -76,6 +80,8 @@ A checagem é somente leitura:
 - Último hotfix: usa `Get-HotFix`, ordena por data e calcula idade em dias.
 - Updates disponíveis: usa COM `Microsoft.Update.Session` para contar updates de software não instalados. Pode demorar 30-60s e falhar em máquinas bloqueadas por política.
 - Drivers antigos: consulta `Win32_PnPSignedDriver` e lista drivers relevantes com data acima de aproximadamente 3 anos.
+- Fontes oficiais online: testa acesso a Microsoft Update Catalog, página oficial do Windows e páginas oficiais de driver conforme GPU detectada.
+- BIOS/suporte: monta URL de busca para o fabricante/modelo detectado, sem baixar firmware nem executar atualização.
 
 O app não baixa, instala, remove nem atualiza nada automaticamente.
 
@@ -145,7 +151,7 @@ DESIGN.md           design system
 
 ## Limitações conhecidas
 
-- BIOS/UEFI raramente expõe todos os estados para o Windows; várias recomendações exigem confirmação manual.
+- BIOS/UEFI raramente expõe todos os estados para o Windows; o app lê interfaces públicas e WMI de fabricante quando existem, e marca o restante como não exposto.
 - Caminhos exatos de menu de BIOS não são informados sem evidência de fabricante/modelo.
 - Sensores dependem do LibreHardwareMonitor rodando e expondo WMI.
 - Windows Update COM pode demorar ou falhar por política corporativa.
@@ -158,7 +164,7 @@ DESIGN.md           design system
 - Não aplicar alterações destrutivas ou privilegiadas automaticamente.
 - Não recomendar desabilitar Secure Boot, TPM, firewall, antivírus ou proteções de memória como tweak genérico.
 - Não automatizar BIOS/UEFI, OC/UV, voltagem, frequência, power limit, driver ou registro.
-- Marcar incerteza como confirmação manual obrigatória.
+- Marcar incerteza como não detectada ou não exposta, sem fingir certeza.
 - Preferir evidência, risco, confiança, validação e rollback a promessas de ganho.
 
 ## Fluxo de uso

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import ctypes
 import platform
 import re
 import socket
@@ -10,6 +11,7 @@ from typing import Any
 
 from app.models.hardware import (
     UNDETECTED,
+    UNEXPOSED,
     BiosInfo,
     FullScan,
     HardwareInfo,
@@ -17,7 +19,7 @@ from app.models.hardware import (
     SystemInfo,
 )
 
-from .updates import collect_updates
+from .updates import collect_updates, enrich_online_update_sources
 from .sensors import collect_sensors
 
 
@@ -279,6 +281,14 @@ def _collect_bios(errors: list[str]) -> BiosInfo:
     hibernation = _query_hibernation(errors)
     if hibernation is not None:
         bios.hibernation = "Habilitado" if hibernation else "Desabilitado"
+    bios.firmware_tables = _enumerate_firmware_tables(errors)
+    bios.exposed_settings = _collect_exposed_bios_settings(errors)
+    if bios.exposed_settings:
+        bios.exposure_note = (
+            "Configurações de BIOS expostas por interface WMI do fabricante foram lidas."
+        )
+    else:
+        bios.exposure_note = UNEXPOSED
     return bios
 
 
@@ -428,11 +438,113 @@ def _query_hibernation(errors: list[str]) -> bool | None:
     if not text:
         return None
     low = text.lower()
-    if "hibernate has not been enabled" in low or "hiberna" in low and "nÃ£o foi habilit" in low:
+    if "hibernate has not been enabled" in low or "hiberna" in low and "não foi habilit" in low:
         return False
     if "hibernation" in low or "hiberna" in low:
         return True
     return None
+
+
+def _enumerate_firmware_tables(errors: list[str]) -> list[str]:
+    try:
+        providers = {"RSMB": "Raw SMBIOS", "ACPI": "ACPI", "FIRM": "Firmware"}
+        found: list[str] = []
+        for provider, label in providers.items():
+            sig = int.from_bytes(provider.encode("ascii"), "little")
+            size = ctypes.windll.kernel32.EnumSystemFirmwareTables(sig, None, 0)
+            if size:
+                found.append(label)
+        return found
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"firmware_tables: {exc}")
+        return []
+
+
+def _collect_exposed_bios_settings(errors: list[str]) -> dict[str, str]:
+    settings: dict[str, str] = {}
+    for fn, label in [
+        (_collect_lenovo_bios_settings, "lenovo_bios_settings"),
+        (_collect_hp_bios_settings, "hp_bios_settings"),
+        (_collect_dell_bios_settings, "dell_bios_settings"),
+    ]:
+        try:
+            settings.update(fn())
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{label}: {exc}")
+    return settings
+
+
+def _collect_lenovo_bios_settings() -> dict[str, str]:
+    try:
+        import wmi  # type: ignore
+
+        c = wmi.WMI(namespace="root\\wmi")
+        rows = getattr(c, "Lenovo_BiosSetting", lambda: [])()
+        return _parse_lenovo_bios_settings(
+            str(getattr(row, "CurrentSetting", "") or "") for row in rows
+        )
+    except Exception:
+        return {}
+
+
+def _parse_lenovo_bios_settings(rows) -> dict[str, str]:
+    settings: dict[str, str] = {}
+    for raw in rows:
+        if not raw or "," not in raw:
+            continue
+        name, value = raw.split(",", 1)
+        name = _safe_setting_name(name)
+        value = value.strip()
+        if name and value:
+            settings[name] = value
+    return settings
+
+
+def _collect_hp_bios_settings() -> dict[str, str]:
+    try:
+        import wmi  # type: ignore
+
+        c = wmi.WMI(namespace="root\\hp\\instrumentedBIOS")
+        rows = getattr(c, "HP_BIOSEnumeration", lambda: [])()
+        out: dict[str, str] = {}
+        for row in rows:
+            name = _safe_setting_name(str(getattr(row, "Name", "") or ""))
+            value = str(getattr(row, "CurrentValue", "") or "").strip()
+            if name and value:
+                out[name] = value
+        return out
+    except Exception:
+        return {}
+
+
+def _collect_dell_bios_settings() -> dict[str, str]:
+    try:
+        import wmi  # type: ignore
+
+        c = wmi.WMI(namespace="root\\dcim\\sysman")
+        rows = []
+        for class_name in ("DCIM_BIOSEnumeration", "DCIM_BIOSInteger", "DCIM_BIOSString"):
+            rows.extend(getattr(c, class_name, lambda: [])())
+        out: dict[str, str] = {}
+        for row in rows:
+            name = _safe_setting_name(str(getattr(row, "AttributeName", "") or ""))
+            value = str(
+                getattr(row, "CurrentValue", "") or getattr(row, "CurrentValueName", "") or ""
+            ).strip()
+            if name and value:
+                out[name] = value
+        return out
+    except Exception:
+        return {}
+
+
+def _safe_setting_name(value: str) -> str:
+    name = value.strip()
+    blocked = {"serial", "uuid", "asset", "tag", "password", "token", "key"}
+    low = name.lower()
+    if any(part in low for part in blocked):
+        return ""
+    return name
 
 
 def _query_firmware_type(errors: list[str]) -> str | None:
@@ -453,16 +565,39 @@ def collect_full_scan() -> FullScan:
     """Run a full automatic read-only snapshot of the machine.
 
     No user prompts, no UAC elevation, no interactive confirmations. Failures
-    are recorded in ``collection_errors`` and the corresponding fields keep
-    the "not detected — manual confirmation required" sentinel.
+    are recorded in ``collection_errors``. Firmware settings that the vendor
+    does not expose are marked as not exposed instead of guessed.
     """
     errors: list[str] = []
+    system = _collect_system(errors)
+    hardware = _collect_hardware(errors)
+    bios = _collect_bios(errors)
+    updates = collect_updates(errors)
+    enrich_online_update_sources(updates, hardware, bios, errors)
     scan = FullScan(
-        system=_collect_system(errors),
-        hardware=_collect_hardware(errors),
-        bios=_collect_bios(errors),
-        updates=collect_updates(errors),
+        system=system,
+        hardware=hardware,
+        bios=bios,
+        updates=updates,
         collected_at=_dt.datetime.now().isoformat(timespec="seconds"),
         collection_errors=errors,
+        detection_sources={
+            "system": ["platform", "socket", "powercfg"],
+            "hardware": ["psutil", "WMI Win32_*", "nvidia-smi quando disponível"],
+            "bios": [
+                "WMI Win32_BIOS",
+                "Confirm-SecureBootUEFI",
+                "Get-Tpm",
+                "DeviceGuard WMI",
+                "vendor BIOS WMI quando exposto",
+            ],
+            "updates": [
+                "registro Windows",
+                "Get-HotFix",
+                "Microsoft.Update.Session",
+                "Win32_PnPSignedDriver",
+                "fontes oficiais online quando acessíveis",
+            ],
+        },
     )
     return scan

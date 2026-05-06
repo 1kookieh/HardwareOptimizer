@@ -137,8 +137,8 @@ class MainWindow(QMainWindow):
 
         layout.addStretch(1)
         notice = QLabel(
-            "A coleta é automática e somente leitura. Recomendações sensíveis "
-            "(BIOS/UEFI, drivers, etc.) exigem ação manual do usuário."
+            "A coleta usa modo de detecção máxima e somente leitura. O app lê "
+            "fontes locais e oficiais online, sem aplicar mudanças no sistema."
         )
         notice.setObjectName("Subtitle")
         notice.setWordWrap(True)
@@ -154,7 +154,7 @@ class MainWindow(QMainWindow):
             "1. Selecione um perfil.\n"
             "2. Se for 'Jogos', selecione os títulos.\n"
             "3. Clique em 'Analisar computador'. A coleta é automática.\n"
-            "4. Revise as recomendações e marque-as como aplicadas/ignoradas.\n"
+            "4. Revise evidências, fontes e recomendações.\n"
             "5. Exporte o relatório em JSON ou HTML.\n"
         )
         self.tabs.addTab(self.dashboard, "Dashboard")
@@ -314,7 +314,15 @@ class MainWindow(QMainWindow):
 
         lines += ["", "BIOS / UEFI", "-" * 40]
         for k, v in scan.bios.to_dict().items():
+            if k == "exposed_settings":
+                continue
             lines.append(f"{k}: {v}")
+        if scan.bios.exposed_settings:
+            lines += ["", "Configurações de BIOS expostas pelo fabricante", "-" * 40]
+            for name, value in sorted(scan.bios.exposed_settings.items()):
+                lines.append(f"{name}: {value}")
+        else:
+            lines.append(f"configurações detalhadas: {scan.bios.exposure_note}")
 
         lines += ["", "Atualizações", "-" * 40]
         for k, v in scan.updates.to_dict().items():
@@ -334,6 +342,11 @@ class MainWindow(QMainWindow):
             lines += ["", "Avisos de coleta (não bloqueantes)", "-" * 40]
             lines += [f"- {e}" for e in scan.collection_errors]
 
+        if scan.detection_sources:
+            lines += ["", "Fontes de detecção", "-" * 40]
+            for area, sources in scan.detection_sources.items():
+                lines.append(f"{area}: {', '.join(sources)}")
+
         self.hardware_text.setPlainText("\n".join(lines))
         self._render_updates(scan)
 
@@ -346,7 +359,16 @@ class MainWindow(QMainWindow):
         lines.append(f"Idade do último hotfix (dias): {updates.last_hotfix_age_days}")
         lines.append(f"Updates disponíveis: {updates.available_windows_updates}")
         lines.append(f"Status da checagem: {updates.update_check_status}")
+        lines.append(f"Status online: {updates.online_check_status}")
+        lines.append(f"URL BIOS/suporte: {updates.bios_lookup_url}")
         lines.append(f"Drivers avaliados: {updates.drivers_total}")
+
+        if updates.official_sources:
+            lines += ["", "Fontes oficiais consultadas", "-" * 40]
+            lines += [f"- {url}" for url in updates.official_sources]
+        if updates.driver_lookup_urls:
+            lines += ["", "URLs oficiais de drivers", "-" * 40]
+            lines += [f"- {kind}: {url}" for kind, url in updates.driver_lookup_urls.items()]
 
         lines += ["", "Drivers antigos (>3 anos)", "-" * 40]
         if updates.outdated_drivers:
@@ -523,7 +545,7 @@ class RecommendationDialog(QDialog):
             ("Como validar", rec.how_to_validate),
             ("Segurança", rec.safety_note),
             ("Rollback", rec.rollback),
-            ("Confirmação manual", "Sim" if rec.manual_confirmation_required else "Não"),
+            ("Ação sensível", "Sim" if rec.manual_confirmation_required else "Não"),
         ]:
             if not value:
                 continue
