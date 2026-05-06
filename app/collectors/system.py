@@ -561,19 +561,39 @@ def _query_firmware_type(errors: list[str]) -> str | None:
     return cleaned or None
 
 
-def collect_full_scan() -> FullScan:
+def collect_full_scan(on_stage=None) -> FullScan:
     """Run a full automatic read-only snapshot of the machine.
 
     No user prompts, no UAC elevation, no interactive confirmations. Failures
     are recorded in ``collection_errors``. Firmware settings that the vendor
     does not expose are marked as not exposed instead of guessed.
+
+    Parameters
+    ----------
+    on_stage:
+        Callback opcional ``(label: str, percent: int) -> None`` chamado
+        antes de cada etapa. Permite à UI exibir progresso sem bloquear
+        o uso programático do coletor.
     """
+    def _stage(label: str, percent: int) -> None:
+        if on_stage is not None:
+            try:
+                on_stage(label, percent)
+            except Exception:  # noqa: BLE001
+                pass
+
     errors: list[str] = []
+    _stage("Sistema", 5)
     system = _collect_system(errors)
+    _stage("Hardware", 20)
     hardware = _collect_hardware(errors)
+    _stage("BIOS / UEFI", 45)
     bios = _collect_bios(errors)
+    _stage("Atualizações locais", 65)
     updates = collect_updates(errors)
+    _stage("Fontes oficiais online", 90)
     enrich_online_update_sources(updates, hardware, bios, errors)
+    _stage("Finalizando", 99)
     scan = FullScan(
         system=system,
         hardware=hardware,

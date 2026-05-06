@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QStatusBar,
@@ -30,13 +31,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.collectors import collect_full_scan
 from app.models.hardware import FullScan
 from app.models.profile import PROFILES, SUPPORTED_GAMES
 from app.recommendations import generate_recommendations
 from app.reports import build_report_dict, export_html, export_json
 from app.storage import HistoryStore
 
+from .scan_worker import ScanWorker
 from .theme import DARK_QSS, LIGHT_QSS
 
 
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self._status_map: dict[str, str] = {}
         self._dark = True
         self._compact = False
+        self._scan_worker: ScanWorker | None = None
 
         self._build_ui()
         self._apply_theme()
@@ -76,6 +78,11 @@ class MainWindow(QMainWindow):
         self._outer.addWidget(self._main, 1)
 
         self.setStatusBar(QStatusBar())
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setMaximumWidth(220)
+        self._progress_bar.setRange(0, 100)
+        self._progress_bar.setVisible(False)
+        self.statusBar().addPermanentWidget(self._progress_bar)
         self.statusBar().showMessage("Pronto.")
 
     def _build_sidebar(self) -> QWidget:
@@ -232,11 +239,36 @@ class MainWindow(QMainWindow):
         return [k for k, cb in self.game_checks.items() if cb.isChecked()]
 
     def _on_scan_clicked(self) -> None:
+        if self._scan_worker is not None and self._scan_worker.isRunning():
+            return
+
         self.scan_btn.setEnabled(False)
         self.scan_btn.setText("Analisando…")
         self.statusBar().showMessage("Coletando dados do sistema… (somente leitura)")
+        self._progress_bar.setValue(0)
+        self._progress_bar.setVisible(True)
+
+        worker = ScanWorker(self)
+        worker.progress.connect(self._on_scan_progress)
+        worker.finished_ok.connect(self._on_scan_finished)
+        worker.failed.connect(self._on_scan_failed)
+        worker.finished.connect(worker.deleteLater)
+        self._scan_worker = worker
+        worker.start()
+
+    def _on_scan_progress(self, label: str, percent: int) -> None:
+        self.statusBar().showMessage(f"Coletando: {label}…")
+        self._progress_bar.setValue(percent)
+
+    def _on_scan_failed(self, message: str) -> None:
+        self._progress_bar.setVisible(False)
+        QMessageBox.critical(self, "Erro na análise", message)
+        self.scan_btn.setEnabled(True)
+        self.scan_btn.setText("Analisar computador")
+        self._scan_worker = None
+
+    def _on_scan_finished(self, scan: FullScan) -> None:
         try:
-            scan = collect_full_scan()
             profile = self.profile_combo.currentData()
             games = self._selected_games()
             recs = generate_recommendations(scan, profile, games)
@@ -261,10 +293,12 @@ class MainWindow(QMainWindow):
                 f"Avisos de coleta: {len(scan.collection_errors)}."
             )
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Erro na análise", str(exc))
+            QMessageBox.critical(self, "Erro ao processar resultado", str(exc))
         finally:
+            self._progress_bar.setVisible(False)
             self.scan_btn.setEnabled(True)
             self.scan_btn.setText("Analisar computador")
+            self._scan_worker = None
 
     # ---------- rendering ----------
     def _render_hardware(self, scan: FullScan) -> None:
