@@ -1,11 +1,16 @@
 """Tela inicial: CTA circular animado à esquerda, configuração à direita.
 
-Layout responsivo: em janelas estreitas (<960px), o lado direito vai
-abaixo do botão circular (stack vertical). Caso contrário, side-by-side.
+Layout:
+- Coluna esquerda: branding + botão circular + hint + status
+- Coluna direita: ProfilePicker + GamesPanel (slide-down condicional)
+
+A coluna direita tem largura mínima 360px para garantir que o seletor
+de perfil sempre apareça mesmo em janelas estreitas. A esquerda fixa
+em ~340px para dar espaço ao botão sem espremer a direita.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -27,44 +32,69 @@ class StartScreen(QWidget):
         self.setStyleSheet(f"background-color:{Color.BACKGROUND};")
 
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(Spacing.XL, Spacing.XL, Spacing.XL, Spacing.XL)
-        outer.setSpacing(Spacing.XL)
+        outer.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        outer.setSpacing(Spacing.LG)
 
-        outer.addWidget(self._build_left(), 1)
+        outer.addWidget(self._build_left(), 0)
         outer.addWidget(self._build_right(), 1)
 
-    # --- left: circular CTA ---
+        # Sincroniza GamesPanel com o perfil default (signal só dispara
+        # após esta conexão, então fazemos um nudge manual aqui).
+        self._on_profile_changed(self.profile_picker.selected_profile())
+
+    # --- left: circular CTA ------------------------------------------------
     def _build_left(self) -> QWidget:
         wrapper = QWidget()
-        wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        wrapper.setMinimumWidth(300)
+        wrapper.setMaximumWidth(380)
+        wrapper.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+
         layout = QVBoxLayout(wrapper)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(Spacing.MD)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(Spacing.SM)
+        layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
         brand = QLabel("HardwareOptimizer")
         brand.setStyleSheet(
-            f"color:{Color.ON_SURFACE};font-size:22px;font-weight:700;"
+            f"color:{Color.ON_SURFACE};font-size:24px;font-weight:800;"
+            f"letter-spacing:0.5px;"
         )
         brand.setAlignment(Qt.AlignCenter)
         layout.addWidget(brand)
 
-        tagline = QLabel("Análise local, advisory-first, sem alterações automáticas.")
-        tagline.setStyleSheet(f"color:{Color.MUTED};font-size:13px;")
+        tagline = QLabel("Análise local · advisory-first · sem alterações automáticas")
+        tagline.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
         tagline.setAlignment(Qt.AlignCenter)
         tagline.setWordWrap(True)
         layout.addWidget(tagline)
 
         layout.addSpacing(Spacing.LG)
 
+        # Container fixo para o botão (mantém centralizado)
+        btn_container = QWidget()
+        btn_container.setFixedHeight(320)
+        btn_layout = QVBoxLayout(btn_container)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setAlignment(Qt.AlignCenter)
         self.start_button = CircularStartButton()
         self.start_button.clicked.connect(self._on_start_clicked)
-        layout.addWidget(self.start_button, 0, Qt.AlignHCenter)
+        btn_layout.addWidget(self.start_button, 0, Qt.AlignCenter)
+        layout.addWidget(btn_container, 0, Qt.AlignHCenter)
 
-        layout.addSpacing(Spacing.MD)
+        hint = QLabel("Coleta automática · somente leitura")
+        hint.setStyleSheet(
+            f"color:{Color.ACCENT};font-size:11px;"
+            f"letter-spacing:1.5px;text-transform:uppercase;"
+        )
+        hint.setAlignment(Qt.AlignCenter)
+        layout.addWidget(hint)
+
+        layout.addSpacing(Spacing.SM)
 
         self.status_label = QLabel("Pronto para iniciar.")
-        self.status_label.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
+        self.status_label.setStyleSheet(
+            f"color:{Color.MUTED};font-size:13px;font-weight:500;"
+        )
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
@@ -72,10 +102,12 @@ class StartScreen(QWidget):
         layout.addStretch(1)
         return wrapper
 
-    # --- right: profile + games ---
+    # --- right: profile + games -------------------------------------------
     def _build_right(self) -> QWidget:
         right = QFrame()
+        right.setMinimumWidth(320)
         right.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         layout = QVBoxLayout(right)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(Spacing.MD)
@@ -90,7 +122,7 @@ class StartScreen(QWidget):
         layout.addStretch(1)
         return right
 
-    # --- handlers ---
+    # --- handlers ----------------------------------------------------------
     def _on_profile_changed(self, key: str) -> None:
         self.games_panel.reveal(key == "games")
 
@@ -101,7 +133,7 @@ class StartScreen(QWidget):
         games = self.games_panel.selected_games() if profile == "games" else []
         self.startRequested.emit(profile, games)
 
-    # --- public API used by MainWindow ---
+    # --- public API used by MainWindow ------------------------------------
     def set_running(self, running: bool) -> None:
         self.start_button.set_running(running)
         self.start_button.setEnabled(not running)
