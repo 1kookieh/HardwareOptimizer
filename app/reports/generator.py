@@ -9,6 +9,7 @@ from typing import Any
 from app.models.hardware import FullScan
 from app.models.profile import PROFILES, SUPPORTED_GAMES
 from app.models.recommendation import Category, Recommendation
+from app.recommendations.quality_spec import quality_spec_reference
 
 
 _PRE_BIOS_CHECKLIST = [
@@ -53,6 +54,7 @@ def build_report_dict(
         "detection_sources": {
             key: list(values) for key, values in scan.detection_sources.items()
         },
+        "recommendation_quality_spec": quality_spec_reference().to_dict(),
         "recommendations": [r.to_dict() for r in recommendations],
         "summary": _build_summary(recommendations),
         "checklists": {

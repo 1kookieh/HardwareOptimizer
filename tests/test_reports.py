@@ -11,10 +11,11 @@ def test_report_dict_has_required_sections():
     recs = generate_recommendations(scan, "games", games=["valorant"])
     report = build_report_dict(scan, "games", ["valorant"], recs)
     for key in ["generated_at", "profile", "games", "system", "hardware",
-                "bios", "updates", "detection_sources", "recommendations",
-                "summary", "checklists", "safety_notice"]:
+                "bios", "updates", "detection_sources", "recommendation_quality_spec",
+                "recommendations", "summary", "checklists", "safety_notice"]:
         assert key in report
     assert report["summary"]["total"] == len(recs)
+    assert report["recommendation_quality_spec"]["exists"] is True
 
 
 def test_export_json(tmp_path: Path):

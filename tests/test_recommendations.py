@@ -17,6 +17,14 @@ def test_unknown_profile_raises():
         generate_recommendations(make_scan(), "wrong")
 
 
+def test_engine_registers_recommendation_quality_spec_source():
+    scan = make_scan()
+    generate_recommendations(scan, "general")
+    sources = scan.detection_sources["recommendation_quality_spec"]
+    assert any("recommendation_quality_spec.md" in source for source in sources)
+    assert any(source.startswith("sha256:") for source in sources)
+
+
 def test_games_only_emit_when_profile_is_games():
     scan = make_scan()
     recs = generate_recommendations(scan, "general", games=["valorant"])

@@ -6,10 +6,9 @@ from app.models.profile import PROFILES
 from app.models.recommendation import Priority, Recommendation
 from app.safety import filter_safe_recommendations
 
-_log = get_logger("recommendations.engine")
-
 from .bios import build_bios_recommendations
 from .games import build_games_recommendations
+from .quality_spec import quality_spec_detection_source, quality_spec_reference
 from .rules import (
     build_drivers_recommendations,
     build_storage_recommendations,
@@ -17,6 +16,7 @@ from .rules import (
 )
 from .updates import build_updates_recommendations
 
+_log = get_logger("recommendations.engine")
 
 _PRIORITY_RANK = {
     Priority.CRITICAL: 0,
@@ -37,6 +37,9 @@ def generate_recommendations(
     if profile_key != "games":
         games = []
 
+    scan.detection_sources["recommendation_quality_spec"] = quality_spec_detection_source()
+    spec_ref = quality_spec_reference()
+
     recs: list[Recommendation] = []
     recs.extend(build_bios_recommendations(scan, profile_key))
     recs.extend(build_updates_recommendations(scan, profile_key))
@@ -51,21 +54,23 @@ def generate_recommendations(
     recs.sort(
         key=lambda r: (
             _PRIORITY_RANK[r.priority],
+            0 if r.evidence else 1,
             cat_rank.get(r.category.value, 99),
             r.title,
         )
     )
     safe_recs, violations = filter_safe_recommendations(recs)
     if violations:
-        # Em caso de regra violada, registramos no scan para auditoria
-        # mas mantemos a recomendação fora da lista entregue à UI/relatório.
-        for v in violations:
-            _log.warning("safety guard removeu recomendação: %s", v)
-        scan.collection_errors.extend(f"safety: {v}" for v in violations)
+        for violation in violations:
+            _log.warning("safety guard removeu recomendação: %s", violation)
+        scan.collection_errors.extend(f"safety: {violation}" for violation in violations)
+
+    spec_id = spec_ref.sha256[:12] if spec_ref.exists else "ausente"
     _log.info(
-        "engine gerou %d recomendação(ões) para perfil=%s, jogos=%s",
+        "engine gerou %d recomendação(ões) para perfil=%s, jogos=%s, spec=%s",
         len(safe_recs),
         profile_key,
         games,
+        spec_id,
     )
     return safe_recs
