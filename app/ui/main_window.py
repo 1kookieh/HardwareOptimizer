@@ -39,6 +39,7 @@ from .scan_worker import ScanWorker
 from .start_screen import StartScreen
 from .theme import DARK_QSS, LIGHT_QSS
 from .tokens import Color, Spacing
+from .widgets import category_chip, priority_chip, risk_chip, status_chip
 
 
 COMPACT_BREAKPOINT = 960
@@ -399,18 +400,22 @@ class MainWindow(QMainWindow):
     def _fill_table(self, table: QTableWidget, recs) -> None:
         table.setRowCount(len(recs))
         for row, rec in enumerate(recs):
-            cells = [
-                rec.title,
-                rec.category.value,
-                rec.priority.value,
-                rec.risk.value,
-                self._status_map.get(rec.title, "pending"),
-                rec.expected_benefit,
-            ]
-            for col, val in enumerate(cells):
-                item = QTableWidgetItem(str(val))
+            current_status = self._status_map.get(rec.title, "pending")
+            title_item = QTableWidgetItem(rec.title)
+            cat_item = category_chip(rec.category.value)
+            prio_item = priority_chip(rec.priority.value)
+            risk_item = risk_chip(rec.risk.value)
+            stat_item = status_chip(current_status)
+            summary_item = QTableWidgetItem(rec.expected_benefit)
+
+            for item in (title_item, cat_item, prio_item, risk_item, stat_item, summary_item):
                 item.setData(Qt.UserRole, rec)
-                table.setItem(row, col, item)
+            table.setItem(row, 0, title_item)
+            table.setItem(row, 1, cat_item)
+            table.setItem(row, 2, prio_item)
+            table.setItem(row, 3, risk_item)
+            table.setItem(row, 4, stat_item)
+            table.setItem(row, 5, summary_item)
         table.resizeColumnsToContents()
 
     def _refresh_status_cells(self) -> None:
@@ -422,7 +427,9 @@ class MainWindow(QMainWindow):
                 rec = title_item.data(Qt.UserRole)
                 if rec is None:
                     continue
-                table.setItem(row, 4, QTableWidgetItem(self._status_map.get(rec.title, "pending")))
+                chip = status_chip(self._status_map.get(rec.title, "pending"))
+                chip.setData(Qt.UserRole, rec)
+                table.setItem(row, 4, chip)
 
     # ---------------------------------------- recommendation interactions
     def _show_rec_details(self, table: QTableWidget, row: int) -> None:
