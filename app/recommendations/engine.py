@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from app.logging_setup import get_logger
 from app.models.hardware import FullScan
 from app.models.profile import PROFILES
 from app.models.recommendation import Priority, Recommendation
 from app.safety import filter_safe_recommendations
+
+_log = get_logger("recommendations.engine")
 
 from .bios import build_bios_recommendations
 from .games import build_games_recommendations
@@ -56,5 +59,13 @@ def generate_recommendations(
     if violations:
         # Em caso de regra violada, registramos no scan para auditoria
         # mas mantemos a recomendação fora da lista entregue à UI/relatório.
+        for v in violations:
+            _log.warning("safety guard removeu recomendação: %s", v)
         scan.collection_errors.extend(f"safety: {v}" for v in violations)
+    _log.info(
+        "engine gerou %d recomendação(ões) para perfil=%s, jogos=%s",
+        len(safe_recs),
+        profile_key,
+        games,
+    )
     return safe_recs
