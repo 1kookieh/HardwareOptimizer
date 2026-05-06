@@ -156,6 +156,7 @@ Antivírus podem sinalizar binários PyInstaller por reputação. Não desabilit
 ```text
 app/
   collectors/       coleta read-only de sistema, hardware, BIOS, sensores e updates
+                    (helper compartilhado em _powershell.py)
   models/           dataclasses normalizadas
   recommendations/  engine determinística e regras por área
   reports/          exportação JSON/HTML

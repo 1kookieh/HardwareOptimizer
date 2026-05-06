@@ -19,6 +19,7 @@ from app.models.hardware import (
     SystemInfo,
 )
 
+from ._powershell import run_powershell
 from .updates import collect_updates, enrich_online_update_sources
 from .sensors import collect_sensors
 
@@ -293,18 +294,7 @@ def _collect_bios(errors: list[str]) -> BiosInfo:
 
 
 def _run_powershell(command: str, errors: list[str], label: str) -> str | None:
-    try:
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", command],
-            capture_output=True,
-            text=True,
-            timeout=8,
-            check=False,
-        )
-        return (out.stdout or "").strip() or None
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"{label}: {exc}")
-        return None
+    return run_powershell(command, errors, label, timeout=8)
 
 
 def _query_secure_boot(errors: list[str]) -> bool | None:

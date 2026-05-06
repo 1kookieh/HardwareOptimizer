@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
-import subprocess
 import sys
 from typing import Any
 from urllib.request import Request, urlopen
 
 from app.models.hardware import UNDETECTED, BiosInfo, DriverInfo, HardwareInfo, UpdatesInfo
+
+from ._powershell import run_powershell
 
 
 _REBOOT_REGISTRY_PATHS = [
@@ -270,20 +271,7 @@ def _collect_outdated_drivers(info: UpdatesInfo, errors: list[str]) -> None:
 
 
 def _run_powershell(command: str, errors: list[str], label: str, timeout: int) -> str | None:
-    try:
-        out = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", command],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-        if out.returncode != 0 and out.stderr:
-            errors.append(f"{label}: {out.stderr.strip()}")
-        return (out.stdout or "").strip() or None
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"{label}: {exc}")
-        return None
+    return run_powershell(command, errors, label, timeout=timeout)
 
 
 def _parse_windows_date(value: Any) -> _dt.datetime | None:
