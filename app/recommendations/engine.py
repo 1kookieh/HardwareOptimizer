@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.models.hardware import FullScan
 from app.models.profile import PROFILES
 from app.models.recommendation import Priority, Recommendation
+from app.safety import filter_safe_recommendations
 
 from .bios import build_bios_recommendations
 from .games import build_games_recommendations
@@ -51,4 +52,9 @@ def generate_recommendations(
             r.title,
         )
     )
-    return recs
+    safe_recs, violations = filter_safe_recommendations(recs)
+    if violations:
+        # Em caso de regra violada, registramos no scan para auditoria
+        # mas mantemos a recomendação fora da lista entregue à UI/relatório.
+        scan.collection_errors.extend(f"safety: {v}" for v in violations)
+    return safe_recs

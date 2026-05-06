@@ -1,3 +1,13 @@
-from .rules import is_blocked_action, BLOCKED_ACTIONS
+from .rules import (
+    BLOCKED_ACTIONS,
+    filter_safe_recommendations,
+    is_blocked_action,
+    violates_safety_rules,
+)
 
-__all__ = ["is_blocked_action", "BLOCKED_ACTIONS"]
+__all__ = [
+    "BLOCKED_ACTIONS",
+    "filter_safe_recommendations",
+    "is_blocked_action",
+    "violates_safety_rules",
+]

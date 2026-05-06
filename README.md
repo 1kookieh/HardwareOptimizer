@@ -160,7 +160,8 @@ app/
   models/           dataclasses normalizadas
   recommendations/  engine determinística e regras por área
   reports/          exportação JSON/HTML
-  safety/           ações bloqueadas e regras de segurança
+  safety/           ações bloqueadas e guard ativo na engine
+                    (filtra promessas de FPS exato, downgrade de BIOS, etc.)
   storage/          SQLite de histórico
   ui/               PySide6
 tests/              testes automatizados
