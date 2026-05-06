@@ -16,8 +16,10 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 - Leitura de configurações detalhadas de BIOS quando o fabricante expõe via WMI.
 - Consulta de fontes oficiais online para Windows Update, drivers e suporte/BIOS.
 - Estados vazios básicos em histórico e tabelas sem recomendações, evitando telas aparentemente quebradas.
+- Tabelas de recomendações com colunas fixas, cabeçalhos não movíveis e ordenação por coluna.
 - Dashboard pós-análise com resumo, maior ponto de atenção, próxima ação segura e top 3 prioridades.
 - Engine determinística de recomendações por perfil.
+- A engine registra a versão do `docs/recommendation_quality_spec.md` usada como referência de qualidade para recomendações.
 - Exportação de relatório JSON/HTML.
 - Histórico local em SQLite.
 - Logs locais com rotação em `%LOCALAPPDATA%/HardwareOptimizer/logs/app.log` (5 arquivos × 1 MB).
@@ -84,6 +86,8 @@ O enriquecimento online só usa páginas oficiais. Quando o fabricante da placa-
 
 Cada recomendação inclui título, categoria, prioridade, risco, justificativa, estado atual, estado recomendado, benefício esperado, impacto, quando não aplicar, validação, nota de segurança, passos manuais, evidência, rollback, confiança e confirmação manual quando necessário.
 
+O arquivo `docs/recommendation_quality_spec.md` documenta o padrão esperado de qualidade das recomendações. A engine referencia esse arquivo em `detection_sources` com caminho e hash SHA-256, e os relatórios JSON incluem `recommendation_quality_spec` para auditoria.
+
 ## Como funciona a checagem de updates e internet
 
 A checagem é somente leitura:
@@ -93,7 +97,7 @@ A checagem é somente leitura:
 - Updates disponíveis: usa COM `Microsoft.Update.Session` para contar updates de software não instalados. Pode demorar 30-60s e falhar em máquinas bloqueadas por política.
 - Drivers antigos: consulta `Win32_PnPSignedDriver` e lista drivers relevantes com data acima de aproximadamente 3 anos.
 - Fontes oficiais online: testa acesso a Microsoft Update Catalog, página oficial do Windows e páginas oficiais de driver conforme GPU detectada.
-- BIOS/suporte: monta URL de busca para o fabricante/modelo detectado, sem baixar firmware nem executar atualização.
+- BIOS/suporte: aponta para fonte oficial do fabricante quando reconhecida, sem baixar firmware nem executar atualização.
 
 O app não baixa, instala, remove nem atualiza nada automaticamente.
 
@@ -108,14 +112,6 @@ Requisitos:
 py -m pip install -r requirements.txt
 ```
 
-## Executar
-
-```powershell
-py -m app.main
-```
-
-## Instalação
-
 Runtime apenas:
 
 ```powershell
@@ -126,6 +122,12 @@ Desenvolvimento (inclui pytest, ruff, mypy, pyinstaller):
 
 ```powershell
 py -m pip install -r requirements-dev.txt
+```
+
+## Executar
+
+```powershell
+py -m app.main
 ```
 
 ## Testes

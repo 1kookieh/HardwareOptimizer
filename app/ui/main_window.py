@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -45,6 +46,7 @@ from .widgets import category_chip, priority_chip, risk_chip, status_chip
 COMPACT_BREAKPOINT = 960
 PAGE_START = 0
 PAGE_RESULTS = 1
+REC_TABLE_COLUMN_WIDTHS = (320, 120, 112, 96, 112, 520)
 
 
 class MainWindow(QMainWindow):
@@ -189,14 +191,27 @@ class MainWindow(QMainWindow):
         table.setHorizontalHeaderLabels(
             ["Título", "Categoria", "Prioridade", "Risco", "Status", "Resumo"]
         )
-        table.horizontalHeader().setStretchLastSection(True)
+        header = table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionsMovable(False)
+        header.setSectionResizeMode(QHeaderView.Fixed)
+        header.setSortIndicatorShown(True)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setAlternatingRowColors(True)
+        table.setSortingEnabled(True)
+        table.setWordWrap(False)
+        table.verticalHeader().setVisible(False)
+        table.verticalHeader().setDefaultSectionSize(34)
+        self._apply_rec_table_widths(table)
         table.cellDoubleClicked.connect(lambda r, _c, t=table: self._show_rec_details(t, r))
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(lambda pos, t=table: self._on_rec_context(t, pos))
         return table
+
+    def _apply_rec_table_widths(self, table: QTableWidget) -> None:
+        for column, width in enumerate(REC_TABLE_COLUMN_WIDTHS):
+            table.setColumnWidth(column, width)
 
     def _apply_accessibility(self) -> None:
         self.stack.setAccessibleName("Navegação principal")
@@ -535,6 +550,7 @@ class MainWindow(QMainWindow):
                 self.tabs.setTabText(self._games_tab_index, title)
 
     def _fill_table(self, table: QTableWidget, recs) -> None:
+        table.setSortingEnabled(False)
         table.clearSpans()
         if not recs:
             table.setRowCount(1)
@@ -544,7 +560,8 @@ class MainWindow(QMainWindow):
             item.setData(Qt.UserRole, None)
             table.setItem(0, 0, item)
             table.setSpan(0, 0, 1, table.columnCount())
-            table.resizeColumnsToContents()
+            self._apply_rec_table_widths(table)
+            table.setSortingEnabled(True)
             return
 
         table.setRowCount(len(recs))
@@ -565,7 +582,8 @@ class MainWindow(QMainWindow):
             table.setItem(row, 3, risk_item)
             table.setItem(row, 4, stat_item)
             table.setItem(row, 5, summary_item)
-        table.resizeColumnsToContents()
+        self._apply_rec_table_widths(table)
+        table.setSortingEnabled(True)
 
     def _refresh_status_cells(self) -> None:
         for table in (self.recs_table, self.bios_table, self.games_table):
