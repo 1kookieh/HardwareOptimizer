@@ -481,6 +481,18 @@ class MainWindow(QMainWindow):
                 self.tabs.setTabText(self._games_tab_index, title)
 
     def _fill_table(self, table: QTableWidget, recs) -> None:
+        table.clearSpans()
+        if not recs:
+            table.setRowCount(1)
+            item = QTableWidgetItem("Nenhuma recomendação nesta categoria.")
+            item.setTextAlignment(Qt.AlignCenter)
+            item.setFlags(Qt.ItemIsEnabled)
+            item.setData(Qt.UserRole, None)
+            table.setItem(0, 0, item)
+            table.setSpan(0, 0, 1, table.columnCount())
+            table.resizeColumnsToContents()
+            return
+
         table.setRowCount(len(recs))
         for row, rec in enumerate(recs):
             current_status = self._status_map.get(rec.title, "pending")
@@ -583,7 +595,15 @@ class MainWindow(QMainWindow):
 
     def _refresh_history(self) -> None:
         self.history_list.clear()
-        for entry in self._store.list_scans():
+        entries = self._store.list_scans()
+        if not entries:
+            item = QListWidgetItem("Nenhuma análise salva ainda. Execute uma análise para criar histórico.")
+            item.setFlags(Qt.ItemIsEnabled)
+            item.setData(Qt.UserRole, None)
+            self.history_list.addItem(item)
+            return
+
+        for entry in entries:
             label = (
                 f"#{entry['id']} · {entry['created_at']} · "
                 f"{PROFILES.get(entry['profile']).label if entry['profile'] in PROFILES else entry['profile']}"
@@ -596,6 +616,8 @@ class MainWindow(QMainWindow):
 
     def _on_history_open(self, item: QListWidgetItem) -> None:
         entry = item.data(Qt.UserRole)
+        if not entry:
+            return
         QMessageBox.information(
             self,
             f"Análise #{entry['id']}",

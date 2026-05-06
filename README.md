@@ -15,6 +15,7 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 - Coleta executada em thread separada (QThread) com barra de progresso por etapa: Sistema → Hardware → BIOS/UEFI → Atualizações locais → Fontes oficiais online. A janela permanece responsiva durante todo o processo.
 - Leitura de configurações detalhadas de BIOS quando o fabricante expõe via WMI.
 - Consulta de fontes oficiais online para Windows Update, drivers e suporte/BIOS.
+- Estados vazios básicos em histórico e tabelas sem recomendações, evitando telas aparentemente quebradas.
 - Engine determinística de recomendações por perfil.
 - Exportação de relatório JSON/HTML.
 - Histórico local em SQLite.
