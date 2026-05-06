@@ -6,6 +6,14 @@ import sys
 from typing import Any
 from urllib.request import Request, urlopen
 
+from app.config import (
+    ONLINE_SOURCE_TIMEOUT_SECONDS,
+    OUTDATED_DRIVER_DAYS,
+    OUTDATED_DRIVERS_REPORT_LIMIT,
+    POWERSHELL_TIMEOUT_DRIVERS,
+    POWERSHELL_TIMEOUT_HOTFIX,
+    POWERSHELL_TIMEOUT_WINDOWS_UPDATE,
+)
 from app.models.hardware import UNDETECTED, BiosInfo, DriverInfo, HardwareInfo, UpdatesInfo
 
 from ._powershell import run_powershell
@@ -146,7 +154,7 @@ def _resolve_bios_support_url(*candidates: str | None) -> str | None:
 def _url_reachable(url: str, errors: list[str]) -> bool:
     try:
         req = Request(url, headers={"User-Agent": "HardwareOptimizer/1.0"})
-        with urlopen(req, timeout=3) as response:
+        with urlopen(req, timeout=ONLINE_SOURCE_TIMEOUT_SECONDS) as response:
             return 200 <= int(response.status) < 400
     except Exception as exc:  # noqa: BLE001
         errors.append(f"online_source {url}: {exc}")
@@ -190,7 +198,7 @@ def _collect_last_hotfix(info: UpdatesInfo, errors: list[str]) -> None:
         "HotFixID, InstalledOn | ConvertTo-Json -Compress",
         errors,
         "last_hotfix",
-        timeout=15,
+        timeout=POWERSHELL_TIMEOUT_HOTFIX,
     )
     if not text:
         return
@@ -216,7 +224,7 @@ def _collect_available_windows_updates(info: UpdatesInfo, errors: list[str]) -> 
         "$r.Updates.Count",
         errors,
         "available_windows_updates",
-        timeout=70,
+        timeout=POWERSHELL_TIMEOUT_WINDOWS_UPDATE,
     )
     if text is None:
         info.update_check_status = "Falhou ou indisponível."
@@ -236,7 +244,7 @@ def _collect_outdated_drivers(info: UpdatesInfo, errors: list[str]) -> None:
         "ConvertTo-Json -Compress -Depth 2",
         errors,
         "drivers",
-        timeout=35,
+        timeout=POWERSHELL_TIMEOUT_DRIVERS,
     )
     if not text:
         return
@@ -244,7 +252,7 @@ def _collect_outdated_drivers(info: UpdatesInfo, errors: list[str]) -> None:
         data = json.loads(text)
         rows = data if isinstance(data, list) else [data]
         info.drivers_total = len(rows)
-        cutoff = _dt.datetime.now() - _dt.timedelta(days=365 * 3)
+        cutoff = _dt.datetime.now() - _dt.timedelta(days=OUTDATED_DRIVER_DAYS)
         outdated: list[DriverInfo] = []
         for row in rows:
             if not isinstance(row, dict):
@@ -265,7 +273,7 @@ def _collect_outdated_drivers(info: UpdatesInfo, errors: list[str]) -> None:
             )
             outdated.append(driver)
         outdated.sort(key=lambda d: d.age_days or 0, reverse=True)
-        info.outdated_drivers = outdated[:20]
+        info.outdated_drivers = outdated[:OUTDATED_DRIVERS_REPORT_LIMIT]
     except Exception as exc:  # noqa: BLE001
         errors.append(f"drivers_parse: {exc}")
 

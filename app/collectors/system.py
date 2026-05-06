@@ -9,6 +9,7 @@ import subprocess
 import sys
 from typing import Any
 
+from app.config import POWERSHELL_TIMEOUT_DEFAULT, XMP_HEURISTIC_MHZ
 from app.models.hardware import (
     UNDETECTED,
     UNEXPOSED,
@@ -171,7 +172,7 @@ def _collect_memory_modules(hw: HardwareInfo, errors: list[str]) -> None:
         speeds = [m.configured_clock_mhz for m in modules if m.configured_clock_mhz]
         if speeds:
             top = max(speeds)
-            hw.ram_xmp_active = top >= 3200
+            hw.ram_xmp_active = top >= XMP_HEURISTIC_MHZ
     except Exception as exc:  # noqa: BLE001
         errors.append(f"memory_modules: {exc}")
 
@@ -294,7 +295,7 @@ def _collect_bios(errors: list[str]) -> BiosInfo:
 
 
 def _run_powershell(command: str, errors: list[str], label: str) -> str | None:
-    return run_powershell(command, errors, label, timeout=8)
+    return run_powershell(command, errors, label, timeout=POWERSHELL_TIMEOUT_DEFAULT)
 
 
 def _query_secure_boot(errors: list[str]) -> bool | None:

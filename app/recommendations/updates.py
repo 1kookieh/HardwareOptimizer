@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.config import STALE_HOTFIX_DAYS
 from app.models.hardware import FullScan
 from app.models.recommendation import Category, Priority, Recommendation, RiskLevel
 
@@ -53,7 +54,7 @@ def build_updates_recommendations(scan: FullScan, profile_key: str) -> list[Reco
             )
         )
 
-    if updates.last_hotfix_age_days is not None and updates.last_hotfix_age_days > 60:
+    if updates.last_hotfix_age_days is not None and updates.last_hotfix_age_days > STALE_HOTFIX_DAYS:
         recs.append(
             Recommendation(
                 title="Verificar Windows Update por falta de hotfix recente",

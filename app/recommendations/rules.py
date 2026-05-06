@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.config import DISK_USAGE_HIGH_RATIO, RAM_COMFORTABLE_GB
 from app.models.hardware import FullScan
 from app.models.recommendation import Category, Priority, Recommendation, RiskLevel
 
@@ -57,7 +58,7 @@ def build_windows_recommendations(scan: FullScan, profile_key: str) -> list[Reco
     )
 
     ram = scan.hardware.ram_total_gb or 0.0
-    if ram and ram < 16:
+    if ram and ram < RAM_COMFORTABLE_GB:
         recs.append(
             Recommendation(
                 title="Considerar upgrade de RAM",
@@ -118,7 +119,7 @@ def build_storage_recommendations(scan: FullScan, profile_key: str) -> list[Reco
     for disk in scan.hardware.storage:
         total = disk.get("total_gb") or 0.0
         used = disk.get("used_gb") or 0.0
-        if total > 0 and (used / total) > 0.9:
+        if total > 0 and (used / total) > DISK_USAGE_HIGH_RATIO:
             recs.append(
                 Recommendation(
                     title=f"Liberar espaço no disco {disk.get('mountpoint')}",
