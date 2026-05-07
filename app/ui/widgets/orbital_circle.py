@@ -24,15 +24,16 @@ from PySide6.QtWidgets import QWidget
 
 from app.ui.tokens import Color
 from app.ui.widgets.circular_button import CircularStartButton
+from app.ui.widgets.icon_asset import load_icon_pixmap
 
 
 STAGE_KEYS = ("system", "hardware", "bios", "updates")
 STAGE_INFO: dict[str, tuple[str, str, float]] = {
     # key: (icon, label, angle in degrees, 0=top, clockwise)
-    "system":   ("▰", "Sistema",  0.0),
-    "hardware": ("▣", "Hardware", 90.0),
-    "bios":     ("▥", "BIOS",     180.0),
-    "updates":  ("↓", "Updates",  270.0),
+    "system":   ("orbit-system", "Sistema",  0.0),
+    "hardware": ("orbit-hardware", "Hardware", 90.0),
+    "bios":     ("orbit-bios", "BIOS",     180.0),
+    "updates":  ("orbit-updates", "Updates",  270.0),
 }
 
 MARKER_RADIUS = 22  # raio dos marcadores
@@ -111,8 +112,9 @@ class OrbitalCircle(QWidget):
                 self._pixmap_cache[stage_key] = pixmap
                 return pixmap
 
-        self._pixmap_cache[stage_key] = None
-        return None
+        built_in = load_icon_pixmap(STAGE_INFO[stage_key][0], size=36)
+        self._pixmap_cache[stage_key] = built_in
+        return built_in
 
     # --- paint ----------------------------------------------------------
     def paintEvent(self, _event):  # noqa: N802
@@ -188,7 +190,7 @@ class OrbitalCircle(QWidget):
         label_font = QFont("Inter, Segoe UI", 10)
         label_font.setBold(True)
         painter.setFont(icon_font)
-        for key, (icon, label, angle_deg) in STAGE_INFO.items():
+        for key, (_icon, label, angle_deg) in STAGE_INFO.items():
             state = self._states.get(key, "idle")
             mx, my = self._point_at(cx, cy, radius, angle_deg)
 
@@ -236,7 +238,7 @@ class OrbitalCircle(QWidget):
             else:
                 painter.setPen(text_color)
                 painter.setFont(icon_font)
-                painter.drawText(icon_rect, Qt.AlignCenter, icon)
+                painter.drawText(icon_rect, Qt.AlignCenter, "•")
 
             label_distance = MARKER_RADIUS + 18
             label_x, label_y = self._point_at(mx, my, label_distance, angle_deg)

@@ -23,16 +23,17 @@ from PySide6.QtWidgets import (
 from app.models.profile import PROFILES
 from app.ui.tokens import Color, PROFILE_ACCENTS, Rounded, Spacing
 from app.ui.widgets.effects import apply_drop_shadow
+from app.ui.widgets.icon_asset import AssetIcon
 
 
 PROFILE_ICONS: dict[str, str] = {
-    "games": "✦",
-    "development": "</>",
-    "video_editing": "▥",
-    "general": "●",
-    "high_performance": "▲",
-    "stability": "⬟",
-    "low_power": "◒",
+    "games": "profile-games",
+    "development": "profile-development",
+    "video_editing": "profile-video",
+    "general": "profile-general",
+    "high_performance": "profile-performance",
+    "stability": "profile-stability",
+    "low_power": "profile-low-power",
 }
 
 
@@ -105,12 +106,7 @@ class _ProfileCard(QPushButton):
         self.icon_box.setStyleSheet(_icon_box_qss(accent))
         ib_layout = QVBoxLayout(self.icon_box)
         ib_layout.setContentsMargins(0, 0, 0, 0)
-        icon_lbl = QLabel(PROFILE_ICONS.get(key, "•"))
-        icon_lbl.setAlignment(Qt.AlignCenter)
-        icon_lbl.setStyleSheet(
-            f"color:{accent};font-size:22px;font-weight:800;"
-            f"background:transparent;border:none;"
-        )
+        icon_lbl = AssetIcon(PROFILE_ICONS.get(key, "profile-general"), fallback="•", size=34)
         ib_layout.addWidget(icon_lbl)
         top.addWidget(self.icon_box, 0, Qt.AlignVCenter)
 

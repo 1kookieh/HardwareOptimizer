@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 from app.storage import GameEntry, GamesRegistry
 from app.ui.tokens import Color, Rounded, Spacing
 from app.ui.widgets.effects import apply_drop_shadow
+from app.ui.widgets.icon_asset import load_icon_pixmap
 
 
 GAME_BADGE_ACCENTS: dict[str, str] = {
@@ -38,12 +39,12 @@ GAME_BADGE_ACCENTS: dict[str, str] = {
 
 # Emoji fallback quando não há arquivo de logo. Genéricos / temáticos.
 GAME_FALLBACK_EMOJI: dict[str, str] = {
-    "valorant": "V",
-    "league_of_legends": "L",
-    "cod_warzone": "WZ",
-    "marvel_rivals": "MR",
-    "fortnite": "F",
-    "cs2": "CS2",
+    "valorant": "game-valorant",
+    "league_of_legends": "game-league",
+    "cod_warzone": "game-warzone",
+    "marvel_rivals": "game-marvel",
+    "fortnite": "game-fortnite",
+    "cs2": "game-cs2",
 }
 
 
@@ -130,8 +131,26 @@ class _GameCard(QFrame):
             inner.addWidget(label)
             return container
 
-        # Fallback local: sigla simbólica, sem asset remoto.
-        badge = GAME_FALLBACK_EMOJI.get(entry.key, "G")
+        # Fallback local: SVG simbólico, sem asset remoto.
+        fallback_pix = load_icon_pixmap(GAME_FALLBACK_EMOJI.get(entry.key, ""), size=36)
+        if fallback_pix is not None:
+            container = QFrame()
+            container.setFixedSize(40, 40)
+            container.setStyleSheet(
+                f"background-color:{Color.SURFACE};"
+                f"border:1px solid {accent};"
+                f"border-radius:{Rounded.SM}px;"
+            )
+            inner = QVBoxLayout(container)
+            inner.setContentsMargins(2, 2, 2, 2)
+            inner.setSpacing(0)
+            label = QLabel()
+            label.setPixmap(fallback_pix)
+            label.setAlignment(Qt.AlignCenter)
+            label.setStyleSheet("background:transparent;border:none;")
+            inner.addWidget(label)
+            return container
+
         container = QFrame()
         container.setFixedSize(40, 40)
         container.setStyleSheet(
@@ -141,7 +160,7 @@ class _GameCard(QFrame):
         inner = QVBoxLayout(container)
         inner.setContentsMargins(0, 0, 0, 0)
         inner.setSpacing(0)
-        badge_lbl = QLabel(badge)
+        badge_lbl = QLabel("G")
         badge_lbl.setAlignment(Qt.AlignCenter)
         badge_lbl.setStyleSheet(
             f"color:{Color.ON_PRIMARY};font-size:13px;font-weight:900;"

@@ -10,13 +10,14 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from app.ui.tokens import Color, Rounded, Spacing
 from app.ui.widgets.effects import apply_drop_shadow
+from app.ui.widgets.icon_asset import AssetIcon
 
 
 BADGES: list[tuple[str, str, str, str]] = [
     # icon, title, subtitle, accent color
-    ("▦", "Local-first", "100% local", Color.ACCENT),
-    ("⬟", "Sem UAC", "Sem elevação", Color.SUCCESS),
-    ("▣", "Read-only", "Apenas leitura", Color.WARNING),
+    ("trust-local", "Local-first", "100% local", Color.ACCENT),
+    ("trust-uac", "Sem UAC", "Sem elevação", Color.SUCCESS),
+    ("trust-readonly", "Read-only", "Apenas leitura", Color.WARNING),
 ]
 
 
@@ -35,13 +36,10 @@ class _TrustCard(QFrame):
         row.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
         row.setSpacing(Spacing.SM)
 
-        icon_lbl = QLabel(icon)
-        icon_lbl.setFixedSize(28, 28)
-        icon_lbl.setAlignment(Qt.AlignCenter)
+        icon_lbl = AssetIcon(icon, fallback="•", size=28)
         icon_lbl.setStyleSheet(
             f"background-color:rgba(15,23,42,0.62);"
             f"border:1px solid {accent};border-radius:{Rounded.SM}px;"
-            f"color:{accent};font-size:16px;font-weight:900;"
         )
         row.addWidget(icon_lbl)
 

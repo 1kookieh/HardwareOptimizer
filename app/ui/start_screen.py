@@ -23,6 +23,7 @@ from app.models.profile import PROFILES
 from app.storage import GamesRegistry
 from app.ui.tokens import Color, Rounded, Spacing
 from app.ui.widgets import (
+    AssetIcon,
     GamesPanel,
     ManageGamesDialog,
     ObjectiveSelector,
@@ -65,6 +66,7 @@ class SessionSummaryPanel(QFrame):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("StartScreen")
         self.setObjectName("SectionCard")
         self.setStyleSheet(_section_card_qss())
         self.setAccessibleName("Resumo da sessão")
@@ -85,27 +87,19 @@ class SessionSummaryPanel(QFrame):
         hint.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
         layout.addWidget(hint)
 
-        self.profile_row = self._meta_row("◈", "Perfil", "Jogos")
-        self.games_row = self._meta_row("▣", "Jogos", "Nenhum selecionado")
-        self.objective_row = self._meta_row("◎", "Objetivo", "FPS")
+        self.profile_row = self._meta_row("profile-games", "Perfil", "Jogos")
+        self.games_row = self._meta_row("game-valorant", "Jogos", "Nenhum selecionado")
+        self.objective_row = self._meta_row("orbit-system", "Objetivo", "FPS")
         layout.addWidget(self.profile_row)
         layout.addWidget(self.games_row)
         layout.addWidget(self.objective_row)
 
         layout.addStretch(1)
 
-        self.safe_mark = QLabel("✓")
+        self.safe_mark = AssetIcon("safe-check", fallback="✓", size=128)
         self.safe_mark.setFixedSize(128, 128)
         self.safe_mark.setAlignment(Qt.AlignCenter)
-        self.safe_mark.setStyleSheet(
-            f"background:qradialgradient(cx:0.5, cy:0.5, radius:0.65,"
-            f"fx:0.5, fy:0.5, stop:0 {Color.SUCCESS},"
-            f"stop:0.45 rgba(34,197,94,0.42),"
-            f"stop:1 rgba(34,197,94,0.05));"
-            f"border:2px solid {Color.SUCCESS};"
-            f"border-radius:64px;color:{Color.ON_PRIMARY};"
-            f"font-size:54px;font-weight:900;"
-        )
+        self.safe_mark.setStyleSheet("background:transparent;border:none;")
         layout.addWidget(self.safe_mark, 0, Qt.AlignHCenter)
 
         safe_title = QLabel("Ambiente seguro")
@@ -123,9 +117,7 @@ class SessionSummaryPanel(QFrame):
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(Spacing.SM)
-        icon_lbl = QLabel(icon)
-        icon_lbl.setFixedWidth(22)
-        icon_lbl.setStyleSheet(f"color:{Color.ACCENT};font-size:13px;font-weight:800;")
+        icon_lbl = AssetIcon(icon, fallback="•", size=18)
         layout.addWidget(icon_lbl)
         label_lbl = QLabel(label)
         label_lbl.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:12px;font-weight:700;")
@@ -164,7 +156,10 @@ class StartScreen(QWidget):
         self.setAccessibleDescription(
             "Tela para escolher perfil, jogos, objetivo e iniciar a análise."
         )
-        self.setStyleSheet(f"background-color:{Color.BACKGROUND};")
+        self.setStyleSheet(
+            f"#StartScreen{{background-color:{Color.BACKGROUND};}}"
+            "QLabel{background:transparent;}"
+        )
 
         self._registry = registry or GamesRegistry()
 
@@ -203,15 +198,9 @@ class StartScreen(QWidget):
         # Brand block: icon + name + subtitle
         brand_box = QHBoxLayout()
         brand_box.setSpacing(Spacing.SM)
-        brand_icon = QLabel("H")
+        brand_icon = AssetIcon("logo", fallback="H", size=42)
         brand_icon.setFixedSize(42, 42)
         brand_icon.setAlignment(Qt.AlignCenter)
-        brand_icon.setStyleSheet(
-            f"background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
-            f"stop:0 {Color.ACCENT}, stop:1 {Color.PRIMARY});"
-            f"color:{Color.ON_PRIMARY};border-radius:{Rounded.MD}px;"
-            f"font-size:22px;font-weight:900;"
-        )
         brand_box.addWidget(brand_icon)
 
         title_box = QVBoxLayout()
@@ -246,7 +235,7 @@ class StartScreen(QWidget):
 
         row.addSpacing(Spacing.SM)
 
-        mode_label = QLabel("◌")
+        mode_label = QLabel("☼")
         mode_label.setFixedSize(36, 36)
         mode_label.setAlignment(Qt.AlignCenter)
         mode_label.setStyleSheet(
@@ -257,7 +246,7 @@ class StartScreen(QWidget):
         row.addWidget(mode_label)
 
         self.theme_btn = QToolButton()
-        self.theme_btn.setText("◐")
+        self.theme_btn.setText("◑")
         self.theme_btn.setAccessibleName("Alternar tema")
         self.theme_btn.setCursor(Qt.PointingHandCursor)
         self.theme_btn.setStyleSheet(
@@ -293,7 +282,7 @@ class StartScreen(QWidget):
         layout.setSpacing(Spacing.SM)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        badge = QLabel("⬟  ANÁLISE LOCAL E SEGURA")
+        badge = QLabel("◆  ANÁLISE LOCAL E SEGURA")
         badge.setAlignment(Qt.AlignCenter)
         badge.setStyleSheet(f"color:{Color.ACCENT};font-size:12px;font-weight:900;")
         layout.addWidget(badge)
@@ -325,10 +314,7 @@ class StartScreen(QWidget):
         bl = QHBoxLayout(banner)
         bl.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
         bl.setSpacing(Spacing.SM)
-        bicon = QLabel("🛡")
-        bicon.setStyleSheet(
-            f"color:{Color.ACCENT};font-size:18px;background:transparent;"
-        )
+        bicon = AssetIcon("trust-readonly", fallback="▣", size=24)
         bl.addWidget(bicon)
         btext = QLabel(
             "<b>Somente leitura. Nenhuma alteração automática.</b><br>"
