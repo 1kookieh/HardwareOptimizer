@@ -10,7 +10,7 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 
 - Interface desktop em PySide6 com tela inicial premium em 3 colunas: painel de análise com orbit/radar, seleção de perfil/jogos/objetivo e coluna de princípios + resumo da sessão. Tema dark/light alternável e layout compacto abaixo de 960px.
 - Assets visuais locais em SVG para logo, perfis, princípios, jogos e orbit; a UI não depende de CDN, URLs externas ou imagens baixadas em tempo de execução.
-- Durante a coleta, o botão circular permite cancelar a análise: ao passar o mouse, o CTA muda para "PARAR" e solicita cancelamento cooperativo no próximo estágio seguro.
+- Durante a coleta, o botão circular permite cancelar a análise: ao passar o mouse, o CTA muda para "PARAR"; ao clicar, a UI volta imediatamente para "ANALISAR PC" e ignora qualquer resultado tardio da coleta cancelada.
 - O anel orbital da tela inicial aceita ícones personalizados em `app/ui/assets/orbit/` (`system`, `hardware`, `bios`, `updates`) sem trocar código; quando não há arquivo, usa fallback visual.
 - A lista de jogos aparece com slide-down animado apenas quando o perfil "Jogos" está selecionado.
 - Atalhos de teclado: `F5` ou `Ctrl+R` iniciam análise, `Esc` volta para a tela inicial, `Ctrl+T` alterna tema, `Ctrl+E` exporta JSON, `Ctrl+Shift+E` exporta HTML.

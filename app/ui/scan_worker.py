@@ -38,6 +38,7 @@ class ScanWorker(QThread):
     def request_abort(self) -> None:
         """Marca a flag de cancelamento. A coleta para no próximo estágio."""
         self._abort = True
+        self.requestInterruption()
 
     def is_aborting(self) -> bool:
         return self._abort
@@ -62,6 +63,6 @@ class ScanWorker(QThread):
             self.failed.emit(str(exc))
 
     def _emit_stage(self, label: str, percent: int) -> None:
-        if self._abort:
+        if self._abort or self.isInterruptionRequested():
             raise ScanAborted()
         self.progress.emit(label, percent)

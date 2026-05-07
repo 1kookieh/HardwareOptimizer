@@ -646,12 +646,32 @@ class MainWindow(QMainWindow):
         if worker is None or not worker.isRunning() or worker.is_aborting():
             return
         worker.request_abort()
+        self._detach_scan_worker(worker)
+        self._scan_worker = None
+        self._progress_bar.setVisible(False)
+        self.start_screen.set_running(False)
+        self.start_screen.orbit.reset_stages()
         self.start_screen.set_status(
-            f"<b>Cancelando análise…</b>  "
+            f"<b>Análise cancelada.</b>  "
             f"<span style='color:{Color.MUTED};font-size:12px;'>"
-            "A coleta será interrompida no próximo estágio seguro.</span>"
+            "Você já pode iniciar uma nova análise.</span>"
         )
-        self.statusBar().showMessage("Cancelando análise…")
+        self.statusBar().showMessage("Análise cancelada. Pronto para iniciar novamente.")
+
+    def _detach_scan_worker(self, worker: ScanWorker) -> None:
+        for signal_name, slot in (
+            ("progress", self._on_scan_progress),
+            ("finished_ok", self._on_scan_finished),
+            ("failed", self._on_scan_failed),
+            ("aborted", self._on_scan_aborted),
+        ):
+            signal = getattr(worker, signal_name, None)
+            if signal is None:
+                continue
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
 
     # Mapeamento: rótulo do progresso → estágio do orbit
     _STAGE_MATCHERS: tuple[tuple[str, str], ...] = (
@@ -671,6 +691,8 @@ class MainWindow(QMainWindow):
         return None
 
     def _on_scan_progress(self, label: str, percent: int) -> None:
+        if self.sender() is not self._scan_worker:
+            return
         self.statusBar().showMessage(f"Coletando: {label}…")
         self.start_screen.set_status(
             f"<b>Coletando: {label}</b>  "
@@ -692,6 +714,8 @@ class MainWindow(QMainWindow):
                 self.start_screen.update_stage(stage, "active")
 
     def _on_scan_failed(self, message: str) -> None:
+        if self.sender() is not self._scan_worker:
+            return
         self._progress_bar.setVisible(False)
         self.start_screen.set_running(False)
         self.start_screen.set_status("Falha na análise.")
@@ -699,6 +723,8 @@ class MainWindow(QMainWindow):
         self._scan_worker = None
 
     def _on_scan_aborted(self) -> None:
+        if self.sender() is not self._scan_worker:
+            return
         self._progress_bar.setVisible(False)
         self.start_screen.set_running(False)
         self.start_screen.orbit.reset_stages()
@@ -723,6 +749,8 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(PAGE_RESULTS)
 
     def _on_scan_finished(self, scan: FullScan) -> None:
+        if self.sender() is not self._scan_worker:
+            return
         try:
             # Marca todos os estágios como concluídos
             for stage in ("system", "hardware", "bios", "updates"):

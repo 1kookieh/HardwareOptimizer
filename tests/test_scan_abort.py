@@ -61,4 +61,6 @@ def test_main_window_abort_request_marks_worker_and_status(monkeypatch):
     window._request_scan_abort()
 
     assert worker.aborting is True
-    assert "Cancelando" in window.start_screen.status_label.text()
+    assert window._scan_worker is None
+    assert window.start_screen.start_button.is_running() is False
+    assert "Análise cancelada" in window.start_screen.status_label.text()
