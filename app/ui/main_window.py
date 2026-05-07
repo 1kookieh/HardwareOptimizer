@@ -100,6 +100,8 @@ class MainWindow(QMainWindow):
 
         self.start_screen = StartScreen()
         self.start_screen.startRequested.connect(self._on_start_requested)
+        self.start_screen.themeToggleRequested.connect(self._toggle_theme)
+        self.start_screen.settingsRequested.connect(self._on_settings_clicked)
         self.stack.addWidget(self.start_screen)
 
         self.results_view = self._build_results_view()
@@ -577,10 +579,43 @@ class MainWindow(QMainWindow):
         self._scan_worker = worker
         worker.start()
 
+    # Mapeamento: rótulo do progresso → estágio do orbit
+    _STAGE_MATCHERS: tuple[tuple[str, str], ...] = (
+        ("sistema", "system"),
+        ("hardware", "hardware"),
+        ("bios", "bios"),
+        ("uefi", "bios"),
+        ("atualiza", "updates"),
+        ("fontes", "updates"),
+    )
+
+    def _stage_from_label(self, label: str) -> str | None:
+        norm = label.lower()
+        for needle, stage in self._STAGE_MATCHERS:
+            if needle in norm:
+                return stage
+        return None
+
     def _on_scan_progress(self, label: str, percent: int) -> None:
         self.statusBar().showMessage(f"Coletando: {label}…")
-        self.start_screen.set_status(f"{label} ({percent}%)")
+        self.start_screen.set_status(
+            f"<b>Coletando: {label}</b>  "
+            f"<span style='color:{Color.MUTED};font-size:12px;'>{percent}%</span>"
+        )
         self._progress_bar.setValue(percent)
+        # Orbit stages
+        stage = self._stage_from_label(label)
+        if stage:
+            # Marca anteriores como done
+            order = ("system", "hardware", "bios", "updates")
+            try:
+                idx = order.index(stage)
+            except ValueError:
+                idx = -1
+            if idx >= 0:
+                for prev in order[:idx]:
+                    self.start_screen.update_stage(prev, "done")
+                self.start_screen.update_stage(stage, "active")
 
     def _on_scan_failed(self, message: str) -> None:
         self._progress_bar.setVisible(False)
@@ -589,8 +624,23 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Erro na análise", message)
         self._scan_worker = None
 
+    def _on_settings_clicked(self) -> None:
+        # Placeholder: leva pra página "Configurações" do dashboard
+        if self._scan is None:
+            QMessageBox.information(
+                self,
+                "Configurações",
+                "Página de Configurações disponível após a primeira análise.",
+            )
+            return
+        self.sidebar.setCurrentRow(NAV_SETTINGS)
+        self.stack.setCurrentIndex(PAGE_RESULTS)
+
     def _on_scan_finished(self, scan: FullScan) -> None:
         try:
+            # Marca todos os estágios como concluídos
+            for stage in ("system", "hardware", "bios", "updates"):
+                self.start_screen.update_stage(stage, "done")
             profile = self._last_profile or "general"
             games = self._last_games
             recs = generate_recommendations(scan, profile, games)

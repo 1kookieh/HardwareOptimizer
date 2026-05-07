@@ -34,7 +34,8 @@ class CircularStartButton(QAbstractButton):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setText("INICIAR")
+        self.setText("Analisar PC")
+        self._subtitle = "Clique para iniciar"
         self.setAccessibleName("Iniciar análise")
         self.setAccessibleDescription(
             "Executa a análise local do computador em modo somente leitura."
@@ -75,7 +76,8 @@ class CircularStartButton(QAbstractButton):
             return
         self._is_running = running
         self._anim.setDuration(800 if running else Motion.PULSE_MS)
-        self.setText("ANALISANDO" if running else "INICIAR")
+        self.setText("Analisando..." if running else "Analisar PC")
+        self._subtitle = "" if running else "Clique para iniciar"
         self.update()
 
     def is_running(self) -> bool:
@@ -153,9 +155,27 @@ class CircularStartButton(QAbstractButton):
             text_color = QColor(Color.ON_PRIMARY)
         painter.setPen(text_color)
 
-        font_size = 30 if not self._is_running else 22
+        font_size = 26 if not self._is_running else 20
         font = QFont("Inter, Segoe UI", font_size)
         font.setBold(True)
-        font.setLetterSpacing(QFont.AbsoluteSpacing, 4)
+        font.setLetterSpacing(QFont.AbsoluteSpacing, 1)
         painter.setFont(font)
-        painter.drawText(rect, Qt.AlignCenter, self.text())
+
+        # Compute layout: title + optional subtitle
+        from PySide6.QtCore import QRect
+        title_rect = QRect(rect)
+        if self._subtitle:
+            title_rect.setHeight(int(rect.height() * 0.55))
+            title_rect.translate(0, int(rect.height() * 0.05))
+        painter.drawText(title_rect, Qt.AlignCenter, self.text())
+
+        if self._subtitle:
+            sub_color = QColor(text_color)
+            sub_color.setAlpha(200)
+            painter.setPen(sub_color)
+            sub_font = QFont("Inter, Segoe UI", 11)
+            sub_font.setBold(False)
+            painter.setFont(sub_font)
+            sub_rect = QRect(rect)
+            sub_rect.setTop(int(rect.height() * 0.58))
+            painter.drawText(sub_rect, Qt.AlignHCenter | Qt.AlignTop, self._subtitle)
