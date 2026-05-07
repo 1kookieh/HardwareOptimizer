@@ -36,6 +36,9 @@ Thumbs.db
 hardware_optimizer_report*.json
 hardware_optimizer_report*.html
 
+# Local/commercial game logo assets
+app/ui/assets/games/*.png
+
 # Local agent/project instructions kept outside commits
 AGENTS.md
 CLAUDE.md

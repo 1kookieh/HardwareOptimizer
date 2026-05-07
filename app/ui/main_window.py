@@ -99,9 +99,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.stack)
 
         self.start_screen = StartScreen()
-        self.start_screen.startRequested.connect(self._on_start_requested)
-        self.start_screen.themeToggleRequested.connect(self._toggle_theme)
-        self.start_screen.settingsRequested.connect(self._on_settings_clicked)
+        self._wire_start_screen(self.start_screen)
         self.stack.addWidget(self.start_screen)
 
         self.results_view = self._build_results_view()
@@ -119,6 +117,12 @@ class MainWindow(QMainWindow):
         self._progress_bar.setVisible(False)
         self.statusBar().addPermanentWidget(self._progress_bar)
         self.statusBar().showMessage("Pronto.")
+
+    def _wire_start_screen(self, start_screen: StartScreen) -> None:
+        start_screen.startRequested.connect(self._on_start_requested)
+        start_screen.themeToggleRequested.connect(self._toggle_theme)
+        start_screen.settingsRequested.connect(self._on_settings_clicked)
+        start_screen.start_button.abortRequested.connect(self._request_scan_abort)
 
     # ------------------------------------------------- results view
     def _build_results_view(self) -> QWidget:
@@ -578,9 +582,7 @@ class MainWindow(QMainWindow):
 
         # Recria StartScreen
         self.start_screen = StartScreen()
-        self.start_screen.startRequested.connect(self._on_start_requested)
-        self.start_screen.themeToggleRequested.connect(self._toggle_theme)
-        self.start_screen.settingsRequested.connect(self._on_settings_clicked)
+        self._wire_start_screen(self.start_screen)
         self.stack.addWidget(self.start_screen)
 
         if prev_profile:
@@ -620,6 +622,7 @@ class MainWindow(QMainWindow):
     def _on_start_requested(self, profile: str, games: list[str]) -> None:
         if self._scan_worker is not None and self._scan_worker.isRunning():
             return
+        self._scan_worker = None
         self._last_profile = profile
         self._last_games = list(games)
 
@@ -633,9 +636,22 @@ class MainWindow(QMainWindow):
         worker.progress.connect(self._on_scan_progress)
         worker.finished_ok.connect(self._on_scan_finished)
         worker.failed.connect(self._on_scan_failed)
+        worker.aborted.connect(self._on_scan_aborted)
         worker.finished.connect(worker.deleteLater)
         self._scan_worker = worker
         worker.start()
+
+    def _request_scan_abort(self) -> None:
+        worker = self._scan_worker
+        if worker is None or not worker.isRunning() or worker.is_aborting():
+            return
+        worker.request_abort()
+        self.start_screen.set_status(
+            f"<b>Cancelando análise…</b>  "
+            f"<span style='color:{Color.MUTED};font-size:12px;'>"
+            "A coleta será interrompida no próximo estágio seguro.</span>"
+        )
+        self.statusBar().showMessage("Cancelando análise…")
 
     # Mapeamento: rótulo do progresso → estágio do orbit
     _STAGE_MATCHERS: tuple[tuple[str, str], ...] = (
@@ -680,6 +696,18 @@ class MainWindow(QMainWindow):
         self.start_screen.set_running(False)
         self.start_screen.set_status("Falha na análise.")
         QMessageBox.critical(self, "Erro na análise", message)
+        self._scan_worker = None
+
+    def _on_scan_aborted(self) -> None:
+        self._progress_bar.setVisible(False)
+        self.start_screen.set_running(False)
+        self.start_screen.orbit.reset_stages()
+        self.start_screen.set_status(
+            f"<b>Análise cancelada.</b>  "
+            f"<span style='color:{Color.MUTED};font-size:12px;'>"
+            "Nenhuma alteração foi feita no sistema.</span>"
+        )
+        self.statusBar().showMessage("Análise cancelada pelo usuário.")
         self._scan_worker = None
 
     def _on_settings_clicked(self) -> None:

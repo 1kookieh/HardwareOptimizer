@@ -305,11 +305,12 @@ class StartScreen(QWidget):
     # --- public API used by MainWindow ------------------------------------
     def set_running(self, running: bool) -> None:
         self.start_button.set_running(running)
-        self.start_button.setEnabled(not running)
+        self.start_button.setEnabled(True)
         self.profile_picker.setEnabled(not running)
         self.games_panel.setEnabled(not running)
         self.objective_selector.setEnabled(not running)
         if running:
+            self.start_button.setToolTip("Passe o mouse e clique em PARAR para cancelar a análise.")
             self.orbit.reset_stages()
             self.status_label.setText(
                 "<b>Coletando dados…</b>  "
@@ -321,6 +322,7 @@ class StartScreen(QWidget):
                 f"border-radius:11px;font-weight:800;font-size:12px;"
             )
         else:
+            self.start_button.setToolTip("Iniciar análise (F5 ou Ctrl+R)")
             self.reset_status()
 
     def update_stage(self, stage: str, state: str) -> None:

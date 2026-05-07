@@ -7,6 +7,7 @@ que refletem o estado de cada estágio (idle / active / done).
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 from PySide6.QtCore import (
     Property,
@@ -18,8 +19,8 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import QWidget
 
 from app.ui.tokens import Color
 from app.ui.widgets.circular_button import CircularStartButton
@@ -36,6 +37,7 @@ STAGE_INFO: dict[str, tuple[str, str, float]] = {
 
 MARKER_RADIUS = 22  # raio dos marcadores
 RING_WIDTH = 5       # espessura do anel base
+ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "orbit"
 
 
 class OrbitalCircle(QWidget):
@@ -51,16 +53,7 @@ class OrbitalCircle(QWidget):
         self.button = CircularStartButton(self)
 
         self._states: dict[str, str] = {k: "idle" for k in STAGE_KEYS}
-        self._labels: dict[str, QLabel] = {}
-        for key, (_icon, label_text, _angle) in STAGE_INFO.items():
-            lbl = QLabel(label_text, self)
-            lbl.setAlignment(Qt.AlignCenter)
-            lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
-            lbl.setStyleSheet(
-                f"color:{Color.MUTED};font-size:12px;font-weight:700;"
-                f"background:transparent;"
-            )
-            self._labels[key] = lbl
+        self._pixmap_cache: dict[str, QPixmap | None] = {}
 
         self._phase = 0.0
         self._anim = QPropertyAnimation(self, b"phase", self)
@@ -101,21 +94,25 @@ class OrbitalCircle(QWidget):
         self.button.setFixedSize(bw, bh)
         self.button.move((w - bw) // 2, (h - bh) // 2)
 
-        cx = w / 2
-        cy = h / 2
-        ring_radius = self._ring_radius()
-        label_distance = ring_radius + MARKER_RADIUS + 18
-        for key, lbl in self._labels.items():
-            angle_deg = STAGE_INFO[key][2]
-            rad = math.radians(angle_deg - 90)
-            lx = cx + math.cos(rad) * label_distance
-            ly = cy + math.sin(rad) * label_distance
-            lbl.adjustSize()
-            lbl.move(int(lx - lbl.width() / 2), int(ly - lbl.height() / 2))
-
     def _ring_radius(self) -> float:
         bw = self.button.width()
         return bw / 2 + 32
+
+    def _load_marker_pixmap(self, stage_key: str) -> QPixmap | None:
+        if stage_key in self._pixmap_cache:
+            return self._pixmap_cache[stage_key]
+
+        for suffix in (".png", ".svg", ".jpg", ".jpeg"):
+            candidate = ASSET_DIR / f"{stage_key}{suffix}"
+            if not candidate.exists():
+                continue
+            pixmap = QPixmap(str(candidate))
+            if not pixmap.isNull():
+                self._pixmap_cache[stage_key] = pixmap
+                return pixmap
+
+        self._pixmap_cache[stage_key] = None
+        return None
 
     # --- paint ----------------------------------------------------------
     def paintEvent(self, _event):  # noqa: N802
@@ -214,32 +211,28 @@ class OrbitalCircle(QWidget):
             painter.setBrush(fill)
             painter.drawEllipse(QPointF(mx, my), MARKER_RADIUS, MARKER_RADIUS)
 
-            # Icone interno
+            # Ícone interno: PNG/SVG customizado, com fallback para emoji.
             text_color = (
                 QColor(Color.ON_PRIMARY) if state in {"active", "done"}
                 else QColor(Color.MUTED)
             )
-            painter.setPen(text_color)
-            painter.drawText(
-                QRectF(mx - MARKER_RADIUS, my - MARKER_RADIUS,
-                       MARKER_RADIUS * 2, MARKER_RADIUS * 2),
-                Qt.AlignCenter,
-                "✓" if state == "done" else icon,
+            pixmap = self._load_marker_pixmap(key)
+            icon_size = MARKER_RADIUS * 2 - 8
+            icon_rect = QRectF(
+                mx - icon_size / 2,
+                my - icon_size / 2,
+                icon_size,
+                icon_size,
             )
-
-            # Label color follows state
-            lbl = self._labels.get(key)
-            if lbl is not None:
-                if state == "active":
-                    lc = Color.ACCENT
-                elif state == "done":
-                    lc = Color.SUCCESS
-                else:
-                    lc = Color.MUTED
-                lbl.setStyleSheet(
-                    f"color:{lc};font-size:12px;font-weight:700;"
-                    f"background:transparent;"
-                )
+            if state == "done":
+                painter.setPen(text_color)
+                painter.drawText(icon_rect, Qt.AlignCenter, "✓")
+            elif pixmap is not None:
+                source = QRectF(0, 0, pixmap.width(), pixmap.height())
+                painter.drawPixmap(icon_rect, pixmap, source)
+            else:
+                painter.setPen(text_color)
+                painter.drawText(icon_rect, Qt.AlignCenter, icon)
 
         painter.end()
 

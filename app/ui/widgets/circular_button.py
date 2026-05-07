@@ -31,6 +31,7 @@ class CircularStartButton(QAbstractButton):
     """Botão circular com pulso contínuo e estados visuais distintos."""
 
     pulseChanged = Signal(float)
+    abortRequested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -42,11 +43,13 @@ class CircularStartButton(QAbstractButton):
         )
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setMouseTracking(True)
         self.setMinimumSize(QSize(260, 260))
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.resize(QSize(300, 300))
         self._pulse = 0.0
         self._is_running = False
+        self._hover_in_circle = False
 
         self._anim = QPropertyAnimation(self, b"pulse", self)
         self._anim.setDuration(Motion.PULSE_MS)
@@ -55,6 +58,9 @@ class CircularStartButton(QAbstractButton):
         self._anim.setEasingCurve(QEasingCurve.OutCubic)
         self._anim.setLoopCount(-1)
         self._anim.start()
+
+        # Quando rodando + clicado: emite abort em vez do clicked padrão
+        self.clicked.connect(self._on_internal_clicked)
 
     def sizeHint(self) -> QSize:
         return QSize(300, 300)
@@ -76,21 +82,58 @@ class CircularStartButton(QAbstractButton):
             return
         self._is_running = running
         self._anim.setDuration(800 if running else Motion.PULSE_MS)
-        self.setText("Analisando..." if running else "Analisar PC")
-        self._subtitle = "" if running else "Clique para iniciar"
+        self._refresh_label()
         self.update()
+
+    def _refresh_label(self) -> None:
+        if self._is_running:
+            if self._hover_in_circle:
+                self.setText("PARAR")
+                self._subtitle = "Clique para cancelar"
+            else:
+                self.setText("Analisando...")
+                self._subtitle = ""
+        else:
+            self.setText("Analisar PC")
+            self._subtitle = "Clique para iniciar"
 
     def is_running(self) -> bool:
         return self._is_running
 
-    # --- hit-test circular ---------------------------------------------
-    def hitButton(self, pos) -> bool:  # noqa: N802
+    def _on_internal_clicked(self) -> None:
+        # Quando rodando o clique pede cancelamento; o sinal externo
+        # ``clicked`` continua existindo (assinado pelo MainWindow)
+        # então o handler de start já checa is_running() e ignora.
+        if self._is_running:
+            self.abortRequested.emit()
+
+    # --- hover (somente dentro do círculo) -----------------------------
+    def mouseMoveEvent(self, event):  # noqa: N802
+        inside = self._point_in_circle(event.position().x(), event.position().y())
+        if inside != self._hover_in_circle:
+            self._hover_in_circle = inside
+            self._refresh_label()
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):  # noqa: N802
+        if self._hover_in_circle:
+            self._hover_in_circle = False
+            self._refresh_label()
+            self.update()
+        super().leaveEvent(event)
+
+    def _point_in_circle(self, x: float, y: float) -> bool:
         rect = self.rect()
         cx, cy = rect.center().x(), rect.center().y()
         radius = min(cx, cy) - 26
-        dx = pos.x() - cx
-        dy = pos.y() - cy
+        dx = x - cx
+        dy = y - cy
         return (dx * dx + dy * dy) <= (radius * radius)
+
+    # --- hit-test circular ---------------------------------------------
+    def hitButton(self, pos) -> bool:  # noqa: N802
+        return self._point_in_circle(pos.x(), pos.y())
 
     # --- paint ----------------------------------------------------------
     def paintEvent(self, _event) -> None:  # noqa: N802
@@ -119,6 +162,9 @@ class CircularStartButton(QAbstractButton):
         # ----- preenchimento com gradiente radial (profundidade)
         if not self.isEnabled():
             base = QColor(Color.SURFACE_ELEVATED)
+        elif self._is_running and self._hover_in_circle:
+            # Hover sobre botão rodando = mostrar intenção de parar
+            base = QColor(Color.DANGER)
         elif self._is_running:
             base = QColor(Color.SCAN_ACTIVE)
         elif self.isDown():
@@ -173,6 +219,8 @@ class CircularStartButton(QAbstractButton):
         # ----- label central
         if not self.isEnabled():
             text_color = QColor(Color.MUTED)
+        elif self._is_running and self._hover_in_circle:
+            text_color = QColor(Color.ON_PRIMARY)
         elif self._is_running:
             text_color = QColor(Color.ON_ACCENT)
         else:

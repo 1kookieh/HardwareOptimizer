@@ -9,6 +9,8 @@ HardwareOptimizer é um app desktop local-first para Windows que analisa hardwar
 ## Status do MVP
 
 - Interface desktop em PySide6 com tela inicial (botão circular animado de iniciar à esquerda, seleção de perfil em cartões à direita) e tela de resultados em abas. Tema dark/light alternável e layout compacto abaixo de 960px.
+- Durante a coleta, o botão circular permite cancelar a análise: ao passar o mouse, o CTA muda para "PARAR" e solicita cancelamento cooperativo no próximo estágio seguro.
+- O anel orbital da tela inicial aceita ícones personalizados em `app/ui/assets/orbit/` (`system`, `hardware`, `bios`, `updates`) sem trocar código; quando não há arquivo, usa fallback visual.
 - A lista de jogos aparece com slide-down animado apenas quando o perfil "Jogos" está selecionado.
 - Atalhos de teclado: `F5` ou `Ctrl+R` iniciam análise, `Esc` volta para a tela inicial, `Ctrl+T` alterna tema, `Ctrl+E` exporta JSON, `Ctrl+Shift+E` exporta HTML.
 - Coleta read-only em modo de detecção máxima, sem UAC, prompts ou mudanças no sistema.
@@ -220,6 +222,7 @@ DESIGN.md           design system
 2. Escolha um perfil.
 3. Se usar o perfil Jogos, selecione os jogos relevantes.
 4. Clique em "Analisar computador".
-5. Revise as abas Hardware, Atualizações, BIOS/UEFI, Jogos e Recomendações.
-6. Marque recomendações como pendentes, aplicadas ou ignoradas.
-7. Exporte JSON/HTML se quiser guardar ou compartilhar o diagnóstico.
+5. Se precisar interromper, passe o mouse sobre o botão central e clique em "PARAR".
+6. Revise as abas Hardware, Atualizações, BIOS/UEFI, Jogos e Recomendações.
+7. Marque recomendações como pendentes, aplicadas ou ignoradas.
+8. Exporte JSON/HTML se quiser guardar ou compartilhar o diagnóstico.
