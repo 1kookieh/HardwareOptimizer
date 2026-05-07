@@ -1,6 +1,7 @@
 from .chips import category_chip, priority_chip, risk_chip, status_chip
 from .circular_button import CircularStartButton
 from .details_panel import RecommendationDetailsPanel
+from .effects import apply_drop_shadow, apply_glow
 from .games_panel import GamesPanel
 from .manage_games_dialog import ManageGamesDialog
 from .objective_selector import ObjectiveSelector
@@ -21,6 +22,8 @@ __all__ = [
     "SidebarNav",
     "StatCard",
     "TrustBadgesColumn",
+    "apply_drop_shadow",
+    "apply_glow",
     "category_chip",
     "priority_chip",
     "risk_chip",

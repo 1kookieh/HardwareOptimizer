@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from app.ui.tokens import Color, Rounded, Spacing
+from app.ui.widgets.effects import apply_drop_shadow
 
 
 BADGES: list[tuple[str, str, str, str]] = [
@@ -57,6 +58,7 @@ class _TrustCard(QFrame):
         text_box.addWidget(s)
 
         row.addLayout(text_box, 1)
+        apply_drop_shadow(self, blur=14, offset_y=2, alpha=55)
 
 
 class TrustBadgesColumn(QWidget):

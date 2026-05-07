@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from app.storage import GameEntry, GamesRegistry
 from app.ui.tokens import Color, Rounded, Spacing
+from app.ui.widgets.effects import apply_drop_shadow
 
 
 GAME_BADGE_ACCENTS: dict[str, str] = {
@@ -107,6 +108,7 @@ class _GameCard(QFrame):
         layout.addWidget(self.checkbox, 0, Qt.AlignRight)
 
         self._apply_style(False)
+        apply_drop_shadow(self, blur=14, offset_y=2, alpha=60)
 
     def _build_icon(self, entry: GameEntry, accent: str) -> QWidget:
         pix = _load_icon_pixmap(entry.key, size=36)

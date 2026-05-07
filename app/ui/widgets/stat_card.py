@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from app.ui.tokens import Color, Rounded, Spacing
+from app.ui.widgets.effects import apply_drop_shadow
 
 
 TONE_COLORS: dict[str, str] = {
@@ -70,6 +71,7 @@ class StatCard(QFrame):
         self.subtitle_lbl.setWordWrap(True)
         layout.addWidget(self.subtitle_lbl)
         layout.addStretch(1)
+        apply_drop_shadow(self, blur=16, offset_y=3, alpha=65)
 
     def update_values(self, value: str, subtitle: str = "") -> None:
         self.value_lbl.setText(value)

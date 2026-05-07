@@ -42,7 +42,7 @@ from app.storage import HistoryStore
 from .scan_worker import ScanWorker
 from .start_screen import StartScreen
 from .theme import DARK_QSS, LIGHT_QSS
-from .tokens import Color, Rounded, Spacing
+from .tokens import Color, Rounded, Spacing, apply_theme as apply_theme_tokens
 from .widgets import (
     RecommendationDetailsPanel,
     SidebarNav,
@@ -541,13 +541,71 @@ class MainWindow(QMainWindow):
 
     # --------------------------------------------------------------- theme
     def _apply_theme(self) -> None:
+        apply_theme_tokens(self._dark)
         self.setStyleSheet(DARK_QSS if self._dark else LIGHT_QSS)
         if hasattr(self, "theme_btn"):
             self.theme_btn.setText("☀" if self._dark else "🌙")
 
     def _toggle_theme(self) -> None:
         self._dark = not self._dark
-        self._apply_theme()
+        # Aplica tokens novos
+        apply_theme_tokens(self._dark)
+        self.setStyleSheet(DARK_QSS if self._dark else LIGHT_QSS)
+        # Reconstroi as views (todos os widgets que usam Color via setStyleSheet
+        # precisam ser recriados pra pegar os tokens novos). Estado é preservado.
+        self._rebuild_views_for_theme()
+        if hasattr(self, "theme_btn"):
+            self.theme_btn.setText("☀" if self._dark else "🌙")
+
+    def _rebuild_views_for_theme(self) -> None:
+        # Captura estado atual
+        prev_index = self.stack.currentIndex()
+        prev_profile = (
+            self.start_screen.profile_picker.selected_profile()
+            if hasattr(self, "start_screen") else None
+        )
+        prev_objective = (
+            self.start_screen.objective_selector.selected()
+            if hasattr(self, "start_screen") else None
+        )
+        prev_nav_row = self.sidebar.currentRow() if hasattr(self, "sidebar") else 0
+
+        # Remove tudo do stack
+        while self.stack.count():
+            w = self.stack.widget(0)
+            self.stack.removeWidget(w)
+            w.deleteLater()
+
+        # Recria StartScreen
+        self.start_screen = StartScreen()
+        self.start_screen.startRequested.connect(self._on_start_requested)
+        self.start_screen.themeToggleRequested.connect(self._toggle_theme)
+        self.start_screen.settingsRequested.connect(self._on_settings_clicked)
+        self.stack.addWidget(self.start_screen)
+
+        if prev_profile:
+            self.start_screen.profile_picker.set_selected(prev_profile)
+        if prev_objective and prev_objective in self.start_screen.objective_selector._buttons:
+            self.start_screen.objective_selector._buttons[prev_objective].setChecked(True)
+
+        # Recria results view
+        self.results_view = self._build_results_view()
+        self.stack.addWidget(self.results_view)
+        self._apply_accessibility()
+
+        # Re-renderiza dados se já existiam
+        if self._scan is not None:
+            self._render_dashboard(self._scan, self._recommendations,
+                                   self._last_profile or "general",
+                                   self._last_games)
+            self._render_hardware(self._scan)
+            self._render_recommendations(self._recommendations, self._last_games)
+            self._update_sidebar_badges(self._scan, self._recommendations)
+            self.export_json_btn.setEnabled(True)
+            self.export_html_btn.setEnabled(True)
+
+        self.sidebar.setCurrentRow(max(0, prev_nav_row))
+        self.stack.setCurrentIndex(prev_index)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)

@@ -128,19 +128,40 @@ class CircularStartButton(QAbstractButton):
         else:
             base = QColor(Color.PRIMARY)
 
-        light = base.lighter(118)
-        dark = base.darker(115)
+        # Gradient mais profundo: highlight branco no topo-esquerdo,
+        # base no meio, sombra escura no canto oposto
+        highlight = QColor(255, 255, 255)
+        highlight.setAlpha(70)
+        bright = base.lighter(135)
+        dark = base.darker(140)
         gradient = QRadialGradient(
-            QPointF(cx - radius * 0.25, cy - radius * 0.30),
-            radius * 1.5,
+            QPointF(cx - radius * 0.35, cy - radius * 0.40),
+            radius * 1.7,
         )
-        gradient.setColorAt(0.0, light)
-        gradient.setColorAt(0.55, base)
+        gradient.setColorAt(0.0, bright)
+        gradient.setColorAt(0.45, base)
         gradient.setColorAt(1.0, dark)
 
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(gradient))
         painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+        # Camada de highlight semi-transparente no topo (efeito vidro)
+        sheen = QRadialGradient(
+            QPointF(cx - radius * 0.20, cy - radius * 0.55),
+            radius * 0.9,
+        )
+        sheen.setColorAt(0.0, highlight)
+        sheen.setColorAt(0.7, QColor(255, 255, 255, 0))
+        painter.setBrush(QBrush(sheen))
+        painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+        # Borda interna sutil
+        inner_border = QColor(0, 0, 0)
+        inner_border.setAlpha(60)
+        painter.setPen(QPen(inner_border, 1))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(QPointF(cx, cy), radius - 1, radius - 1)
 
         # ----- foco visível por acessibilidade
         if self.hasFocus():

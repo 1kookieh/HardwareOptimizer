@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from app.models.profile import PROFILES
 from app.ui.tokens import Color, PROFILE_ACCENTS, Rounded, Spacing
+from app.ui.widgets.effects import apply_drop_shadow
 
 
 PROFILE_ICONS: dict[str, str] = {
@@ -127,6 +128,7 @@ class _ProfileCard(QPushButton):
         layout.addWidget(self.gradient_bar)
 
         self._apply_style(False)
+        apply_drop_shadow(self, blur=18, offset_y=3, alpha=70)
 
     def _apply_style(self, selected: bool) -> None:
         self.setStyleSheet(_card_qss(self.accent, selected))
