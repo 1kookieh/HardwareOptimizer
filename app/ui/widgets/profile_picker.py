@@ -1,7 +1,10 @@
-"""Seletor de perfil em cartões clicáveis com accent color por perfil.
+"""Seletor de perfil em cartões com ícone destacado e accent por perfil.
 
-Layout em grid 2 colunas: cada card mostra ícone, label, descrição curta
-e uma barra de gradient horizontal no rodapé do card selecionado.
+Cada card mostra:
+- ícone em container colorido (accent transparente) à esquerda
+- título + descrição curta no centro
+- badge ✓ visível APENAS no card selecionado
+- barra de gradient horizontal no rodapé do card selecionado
 """
 from __future__ import annotations
 
@@ -33,6 +36,14 @@ PROFILE_ICONS: dict[str, str] = {
 }
 
 
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    h = hex_color.lstrip("#")
+    r = int(h[0:2], 16)
+    g = int(h[2:4], 16)
+    b = int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def _card_qss(accent: str, selected: bool) -> str:
     border_color = accent if selected else Color.BORDER
     bg = Color.SURFACE_ELEVATED if selected else Color.SURFACE
@@ -47,23 +58,22 @@ def _card_qss(accent: str, selected: bool) -> str:
     )
 
 
-def _badge_qss(accent: str, visible: bool) -> str:
-    if not visible:
-        return "background:transparent;border:none;"
+def _icon_box_qss(accent: str) -> str:
     return (
-        f"background-color:{accent};color:{Color.ON_PRIMARY};"
-        f"border-radius:11px;font-size:12px;font-weight:800;"
+        f"background-color:{_hex_to_rgba(accent, 0.15)};"
+        f"border-radius:{Rounded.MD}px;"
+        f"color:{accent};"
     )
 
 
 def _gradient_qss(accent: str, visible: bool) -> str:
     if not visible:
-        return "background:transparent;"
-    # Gradient horizontal terminando no accent
+        return "background:transparent;border:none;"
     return (
         f"background:qlineargradient(x1:0, y1:0, x2:1, y2:0, "
-        f"stop:0 transparent, stop:1 {accent});"
-        f"border-radius:2px;"
+        f"stop:0 transparent, stop:0.4 {_hex_to_rgba(accent, 0.4)}, "
+        f"stop:1 {accent});"
+        f"border-radius:2px;border:none;"
     )
 
 
@@ -77,53 +87,64 @@ class _ProfileCard(QPushButton):
         self.setAccessibleName(f"Perfil {label}")
         self.setAccessibleDescription(description)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(110)
+        self.setMinimumHeight(96)
         self.setText("")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.SM)
-        layout.setSpacing(Spacing.XS)
+        layout.setSpacing(Spacing.SM)
 
-        # Top row: icon + check badge
+        # Linha principal: icon container + texto + badge
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         top.setSpacing(Spacing.MD)
 
+        # Icon container (caixa colorida com transparência)
+        self.icon_box = QFrame()
+        self.icon_box.setFixedSize(48, 48)
+        self.icon_box.setStyleSheet(_icon_box_qss(accent))
+        ib_layout = QVBoxLayout(self.icon_box)
+        ib_layout.setContentsMargins(0, 0, 0, 0)
         icon_lbl = QLabel(PROFILE_ICONS.get(key, "•"))
-        icon_lbl.setFixedSize(36, 36)
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet(
-            f"color:{accent};font-size:22px;font-weight:800;background:transparent;"
+            f"color:{accent};font-size:22px;font-weight:800;"
+            f"background:transparent;border:none;"
         )
-        top.addWidget(icon_lbl, 0)
+        ib_layout.addWidget(icon_lbl)
+        top.addWidget(self.icon_box, 0, Qt.AlignVCenter)
 
+        # Texto
         text_box = QVBoxLayout()
         text_box.setContentsMargins(0, 0, 0, 0)
         text_box.setSpacing(2)
         title_lbl = QLabel(label)
         title_lbl.setStyleSheet(
-            f"color:{Color.ON_SURFACE};font-size:15px;font-weight:700;background:transparent;"
+            f"color:{Color.ON_SURFACE};font-size:15px;font-weight:700;"
+            f"background:transparent;border:none;"
         )
         text_box.addWidget(title_lbl)
         desc_lbl = QLabel(description)
         desc_lbl.setStyleSheet(
-            f"color:{Color.MUTED};font-size:11px;background:transparent;"
+            f"color:{Color.MUTED};font-size:11px;"
+            f"background:transparent;border:none;"
         )
         desc_lbl.setWordWrap(True)
         text_box.addWidget(desc_lbl)
         top.addLayout(text_box, 1)
 
-        self.badge = QLabel("✓")
+        # Badge ✓ — INVISÍVEL e SEM TEXTO até estar selecionado
+        self.badge = QLabel("")
         self.badge.setFixedSize(22, 22)
         self.badge.setAlignment(Qt.AlignCenter)
-        self.badge.setStyleSheet(_badge_qss(accent, False))
+        self.badge.setStyleSheet("background:transparent;border:none;")
         top.addWidget(self.badge, 0, Qt.AlignTop | Qt.AlignRight)
         layout.addLayout(top)
 
         layout.addStretch(1)
 
         self.gradient_bar = QFrame()
-        self.gradient_bar.setFixedHeight(4)
+        self.gradient_bar.setFixedHeight(3)
         self.gradient_bar.setStyleSheet(_gradient_qss(accent, False))
         layout.addWidget(self.gradient_bar)
 
@@ -132,7 +153,17 @@ class _ProfileCard(QPushButton):
 
     def _apply_style(self, selected: bool) -> None:
         self.setStyleSheet(_card_qss(self.accent, selected))
-        self.badge.setStyleSheet(_badge_qss(self.accent, selected))
+        if selected:
+            self.badge.setText("✓")
+            self.badge.setStyleSheet(
+                f"background-color:{self.accent};color:{Color.ON_PRIMARY};"
+                f"border-radius:11px;font-size:12px;font-weight:800;"
+                f"border:none;"
+            )
+        else:
+            # CRUCIAL: remover o texto, não só o background
+            self.badge.setText("")
+            self.badge.setStyleSheet("background:transparent;border:none;")
         self.gradient_bar.setStyleSheet(_gradient_qss(self.accent, selected))
 
 

@@ -116,14 +116,16 @@ class StartScreen(QWidget):
         row.addLayout(brand_box)
         row.addStretch(1)
 
-        self.settings_btn = QPushButton("⚙  Configurações")
+        self.settings_btn = QPushButton("⚙   Configurações")
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.setAccessibleName("Configurações")
+        self.settings_btn.setMinimumHeight(36)
         self.settings_btn.setStyleSheet(
             f"QPushButton{{background-color:{Color.SURFACE_ELEVATED};"
             f"color:{Color.ON_SURFACE};border:1px solid {Color.BORDER};"
-            f"border-radius:{Rounded.SM}px;padding:8px 14px;font-size:13px;}}"
-            f"QPushButton:hover{{border-color:{Color.ACCENT};}}"
+            f"border-radius:{Rounded.MD}px;padding:8px 18px;font-size:13px;font-weight:600;}}"
+            f"QPushButton:hover{{border-color:{Color.ACCENT};"
+            f"background-color:{Color.SURFACE};}}"
         )
         self.settings_btn.clicked.connect(self._on_settings_clicked)
         row.addWidget(self.settings_btn)

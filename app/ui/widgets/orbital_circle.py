@@ -1,12 +1,8 @@
-"""Botão circular envolto por um anel orbital animado.
+"""Botão circular envolto por um anel orbital animado e visível.
 
-Desenha um anel base ao redor do CircularStartButton e um arco de
-"cometa" girando continuamente em loop. Quatro marcadores embutidos
-no anel — Sistema, Hardware, BIOS, Updates — refletem o estágio
-atual da análise via :meth:`set_stage` (idle / active / done).
-
-Idle: cometa gira lentamente e os marcadores ficam neutros.
-Durante scan: cometa acelera e os marcadores acendem em sequência.
+Desenha um anel base mais grosso, um arco de cometa brilhante girando
+continuamente em loop, e quatro marcadores grandes nos pontos cardinais
+que refletem o estado de cada estágio (idle / active / done).
 """
 from __future__ import annotations
 
@@ -38,6 +34,9 @@ STAGE_INFO: dict[str, tuple[str, str, float]] = {
     "updates":  ("⬇", "Updates",  270.0),
 }
 
+MARKER_RADIUS = 22  # raio dos marcadores
+RING_WIDTH = 5       # espessura do anel base
+
 
 class OrbitalCircle(QWidget):
     """Container com anel animado + botão circular ao centro."""
@@ -47,7 +46,7 @@ class OrbitalCircle(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WA_StyledBackground, False)
-        self.setMinimumSize(420, 460)
+        self.setMinimumSize(440, 480)
 
         self.button = CircularStartButton(self)
 
@@ -58,12 +57,11 @@ class OrbitalCircle(QWidget):
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
             lbl.setStyleSheet(
-                f"color:{Color.MUTED};font-size:11px;font-weight:600;"
+                f"color:{Color.MUTED};font-size:12px;font-weight:700;"
                 f"background:transparent;"
             )
             self._labels[key] = lbl
 
-        # Animação de fase contínua (cometa rotacionando)
         self._phase = 0.0
         self._anim = QPropertyAnimation(self, b"phase", self)
         self._anim.setStartValue(0.0)
@@ -74,7 +72,7 @@ class OrbitalCircle(QWidget):
         self._anim.start()
 
     def sizeHint(self) -> QSize:
-        return QSize(460, 480)
+        return QSize(480, 500)
 
     # --- phase property -------------------------------------------------
     def get_phase(self) -> float:
@@ -89,37 +87,35 @@ class OrbitalCircle(QWidget):
 
     # --- speed control --------------------------------------------------
     def _set_idle_speed(self) -> None:
-        self._anim.setDuration(6000)
+        self._anim.setDuration(5000)
 
     def _set_scan_speed(self) -> None:
-        self._anim.setDuration(2200)
+        self._anim.setDuration(1800)
 
     # --- layout ---------------------------------------------------------
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         w, h = self.width(), self.height()
-        # Botão central — ~50% da menor dimensão
-        bw = bh = max(180, int(min(w, h) * 0.45))
+        # Botão central — proporção fixa, ocupa ~55% do menor lado
+        bw = bh = max(200, int(min(w, h) * 0.50))
         self.button.setFixedSize(bw, bh)
         self.button.move((w - bw) // 2, (h - bh) // 2)
 
-        # Posicionar labels fora do anel
         cx = w / 2
         cy = h / 2
         ring_radius = self._ring_radius()
-        label_distance = ring_radius + 30
+        label_distance = ring_radius + MARKER_RADIUS + 18
         for key, lbl in self._labels.items():
             angle_deg = STAGE_INFO[key][2]
-            rad = math.radians(angle_deg - 90)  # 0° = topo
+            rad = math.radians(angle_deg - 90)
             lx = cx + math.cos(rad) * label_distance
             ly = cy + math.sin(rad) * label_distance
             lbl.adjustSize()
             lbl.move(int(lx - lbl.width() / 2), int(ly - lbl.height() / 2))
 
     def _ring_radius(self) -> float:
-        # Raio do anel orbital (entre o botão e a borda do widget)
         bw = self.button.width()
-        return bw / 2 + 26
+        return bw / 2 + 32
 
     # --- paint ----------------------------------------------------------
     def paintEvent(self, _event):  # noqa: N802
@@ -133,37 +129,64 @@ class OrbitalCircle(QWidget):
 
         rect = QRectF(cx - radius, cy - radius, radius * 2, radius * 2)
 
-        # 1) Anel base (faint)
-        base_pen = QPen(QColor(Color.BORDER), 2)
+        # 0) Glow externo atrás do botão (camadas de halo)
+        btn_radius = self.button.width() / 2 if self.button.width() else 100
+        glow_base = QColor(Color.SCAN_ACTIVE if running else Color.PRIMARY)
+        for offset, alpha in ((38, 22), (24, 36), (12, 60)):
+            color = QColor(glow_base)
+            color.setAlpha(alpha)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(color)
+            painter.drawEllipse(QPointF(cx, cy), btn_radius + offset, btn_radius + offset)
+
+        # 1) Anel base — mais grosso e com leve translucência
+        base_color = QColor(Color.BORDER)
+        base_color.setAlphaF(0.85)
+        base_pen = QPen(base_color, RING_WIDTH)
+        base_pen.setCapStyle(Qt.RoundCap)
         painter.setPen(base_pen)
         painter.setBrush(Qt.NoBrush)
         painter.drawEllipse(rect)
 
-        # 2) Cometa: arco curto seguindo a fase atual
+        # 2) Cometa: arco com gradiente de alpha simulando rastro
         sweep_color = QColor(Color.SCAN_ACTIVE if running else Color.ACCENT)
-        # Várias partições para simular um trail com alphas decrescentes
-        steps = 18
-        arc_total = 70.0  # graus de comprimento total do trail
-        # Qt: ângulos em 16ths de grau, 0° = 3h, sentido anti-horário positivo
-        head_angle_deg = 90.0 - self._phase * 360.0  # começa no topo, anti-horário
+        steps = 24
+        arc_total = 100.0  # comprimento do trail
+        head_angle_deg = 90.0 - self._phase * 360.0
         for i in range(steps):
-            t = i / (steps - 1)
+            t = i / (steps - 1) if steps > 1 else 0
             length = arc_total / steps
             start = head_angle_deg - i * length
-            alpha = int(255 * (1 - t) * (1 - t))  # quadrático
+            # alpha forte na cabeça, suave no trail
+            alpha = int(240 * (1 - t) ** 1.4)
+            if alpha < 8:
+                continue
             color = QColor(sweep_color)
             color.setAlpha(alpha)
-            pen = QPen(color, 4, Qt.SolidLine, Qt.RoundCap)
+            pen = QPen(color, RING_WIDTH + 2, Qt.SolidLine, Qt.RoundCap)
             painter.setPen(pen)
             painter.drawArc(
                 rect,
                 int(start * 16),
-                int(-length * 16),  # negativo = sentido horário
+                int(-length * 16),
             )
 
+        # Cabeça do cometa — disco brilhante na frente do trail
+        head_rad = math.radians(head_angle_deg - 90)
+        hx = cx + math.cos(head_rad) * radius
+        hy = cy + math.sin(head_rad) * radius
+        glow = QColor(sweep_color)
+        glow.setAlpha(120)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(glow)
+        painter.drawEllipse(QPointF(hx, hy), 9, 9)
+        bright = QColor(sweep_color)
+        bright.setAlpha(255)
+        painter.setBrush(bright)
+        painter.drawEllipse(QPointF(hx, hy), 5, 5)
+
         # 3) Marcadores nos 4 pontos cardinais
-        marker_radius = 14
-        emoji_font = QFont("Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji", 11)
+        emoji_font = QFont("Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji", 14)
         painter.setFont(emoji_font)
         for key, (icon, _label, angle_deg) in STAGE_INFO.items():
             state = self._states.get(key, "idle")
@@ -172,12 +195,10 @@ class OrbitalCircle(QWidget):
             if state == "active":
                 fill = QColor(Color.ACCENT)
                 ring = QColor(Color.ACCENT)
-                ring.setAlphaF(0.55)
-                # Halo pulsante (fração da fase em senoide)
                 halo_factor = 0.5 + 0.5 * math.sin(self._phase * math.tau * 3)
-                halo_radius = marker_radius + 4 + 6 * halo_factor
+                halo_radius = MARKER_RADIUS + 6 + 10 * halo_factor
                 halo_color = QColor(Color.ACCENT)
-                halo_color.setAlphaF(0.20 + 0.25 * (1 - halo_factor))
+                halo_color.setAlphaF(0.30 + 0.30 * (1 - halo_factor))
                 painter.setPen(Qt.NoPen)
                 painter.setBrush(halo_color)
                 painter.drawEllipse(QPointF(mx, my), halo_radius, halo_radius)
@@ -188,32 +209,25 @@ class OrbitalCircle(QWidget):
                 fill = QColor(Color.SURFACE_ELEVATED)
                 ring = QColor(Color.BORDER)
 
-            # Disco do marcador
+            # Disco do marcador (mais largo: 22px raio)
             painter.setPen(QPen(ring, 2))
             painter.setBrush(fill)
-            painter.drawEllipse(QPointF(mx, my), marker_radius, marker_radius)
+            painter.drawEllipse(QPointF(mx, my), MARKER_RADIUS, MARKER_RADIUS)
 
-            # Ícone dentro
-            if state == "done":
-                painter.setPen(QColor(Color.ON_PRIMARY))
-                painter.drawText(
-                    QRectF(mx - marker_radius, my - marker_radius,
-                           marker_radius * 2, marker_radius * 2),
-                    Qt.AlignCenter,
-                    "✓",
-                )
-            else:
-                painter.setPen(
-                    QColor(Color.ON_PRIMARY) if state == "active" else QColor(Color.MUTED)
-                )
-                painter.drawText(
-                    QRectF(mx - marker_radius, my - marker_radius,
-                           marker_radius * 2, marker_radius * 2),
-                    Qt.AlignCenter,
-                    icon,
-                )
+            # Icone interno
+            text_color = (
+                QColor(Color.ON_PRIMARY) if state in {"active", "done"}
+                else QColor(Color.MUTED)
+            )
+            painter.setPen(text_color)
+            painter.drawText(
+                QRectF(mx - MARKER_RADIUS, my - MARKER_RADIUS,
+                       MARKER_RADIUS * 2, MARKER_RADIUS * 2),
+                Qt.AlignCenter,
+                "✓" if state == "done" else icon,
+            )
 
-            # Label color follow state
+            # Label color follows state
             lbl = self._labels.get(key)
             if lbl is not None:
                 if state == "active":
@@ -223,7 +237,7 @@ class OrbitalCircle(QWidget):
                 else:
                     lc = Color.MUTED
                 lbl.setStyleSheet(
-                    f"color:{lc};font-size:11px;font-weight:700;"
+                    f"color:{lc};font-size:12px;font-weight:700;"
                     f"background:transparent;"
                 )
 
@@ -239,7 +253,6 @@ class OrbitalCircle(QWidget):
         if stage not in self._states:
             return
         self._states[stage] = state
-        # Ajusta velocidade caso haja algum ativo
         any_active = any(s == "active" for s in self._states.values())
         any_pending = any(s in {"active", "idle"} for s in self._states.values())
         if any_active:
