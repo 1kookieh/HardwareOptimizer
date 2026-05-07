@@ -38,12 +38,12 @@ GAME_BADGE_ACCENTS: dict[str, str] = {
 
 # Emoji fallback quando não há arquivo de logo. Genéricos / temáticos.
 GAME_FALLBACK_EMOJI: dict[str, str] = {
-    "valorant": "🎯",
-    "league_of_legends": "⚔",
-    "cod_warzone": "🎖",
-    "marvel_rivals": "🦸",
-    "fortnite": "🌪",
-    "cs2": "🔫",
+    "valorant": "V",
+    "league_of_legends": "L",
+    "cod_warzone": "WZ",
+    "marvel_rivals": "MR",
+    "fortnite": "F",
+    "cs2": "CS2",
 }
 
 
@@ -130,8 +130,8 @@ class _GameCard(QFrame):
             inner.addWidget(label)
             return container
 
-        # Fallback: emoji grande + sigla pequena
-        emoji = GAME_FALLBACK_EMOJI.get(entry.key, "🎮")
+        # Fallback local: sigla simbólica, sem asset remoto.
+        badge = GAME_FALLBACK_EMOJI.get(entry.key, "G")
         container = QFrame()
         container.setFixedSize(40, 40)
         container.setStyleSheet(
@@ -141,12 +141,13 @@ class _GameCard(QFrame):
         inner = QVBoxLayout(container)
         inner.setContentsMargins(0, 0, 0, 0)
         inner.setSpacing(0)
-        emoji_lbl = QLabel(emoji)
-        emoji_lbl.setAlignment(Qt.AlignCenter)
-        emoji_lbl.setStyleSheet(
-            f"color:{Color.ON_PRIMARY};font-size:18px;background:transparent;border:none;"
+        badge_lbl = QLabel(badge)
+        badge_lbl.setAlignment(Qt.AlignCenter)
+        badge_lbl.setStyleSheet(
+            f"color:{Color.ON_PRIMARY};font-size:13px;font-weight:900;"
+            f"background:transparent;border:none;"
         )
-        inner.addWidget(emoji_lbl)
+        inner.addWidget(badge_lbl)
         return container
 
     def mousePressEvent(self, event):  # noqa: N802
@@ -190,7 +191,7 @@ class GamesPanel(QWidget):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(Spacing.XS)
-        title = QLabel("Jogos selecionados")
+        title = QLabel("2. Jogos selecionados")
         title.setStyleSheet(
             f"color:{Color.ON_SURFACE};font-size:14px;font-weight:700;"
         )

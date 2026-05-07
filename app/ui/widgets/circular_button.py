@@ -35,8 +35,8 @@ class CircularStartButton(QAbstractButton):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setText("Analisar PC")
-        self._subtitle = "Clique para iniciar"
+        self.setText("ANALISAR PC")
+        self._subtitle = "Iniciar análise completa"
         self.setAccessibleName("Iniciar análise")
         self.setAccessibleDescription(
             "Executa a análise local do computador em modo somente leitura."
@@ -94,8 +94,8 @@ class CircularStartButton(QAbstractButton):
                 self.setText("Analisando...")
                 self._subtitle = ""
         else:
-            self.setText("Analisar PC")
-            self._subtitle = "Clique para iniciar"
+            self.setText("ANALISAR PC")
+            self._subtitle = "Iniciar análise completa"
 
     def is_running(self) -> bool:
         return self._is_running
@@ -227,7 +227,7 @@ class CircularStartButton(QAbstractButton):
             text_color = QColor(Color.ON_PRIMARY)
         painter.setPen(text_color)
 
-        font_size = 26 if not self._is_running else 20
+        font_size = 24 if not self._is_running else 20
         font = QFont("Inter, Segoe UI", font_size)
         font.setBold(True)
         font.setLetterSpacing(QFont.AbsoluteSpacing, 1)

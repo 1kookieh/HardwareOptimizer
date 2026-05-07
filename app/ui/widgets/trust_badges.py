@@ -14,9 +14,9 @@ from app.ui.widgets.effects import apply_drop_shadow
 
 BADGES: list[tuple[str, str, str, str]] = [
     # icon, title, subtitle, accent color
-    ("💾", "Local-first", "100% local", Color.ACCENT),
-    ("✓", "Sem UAC", "Sem elevação", Color.SUCCESS),
-    ("🔒", "Read-only", "Apenas leitura", Color.WARNING),
+    ("▦", "Local-first", "100% local", Color.ACCENT),
+    ("⬟", "Sem UAC", "Sem elevação", Color.SUCCESS),
+    ("▣", "Read-only", "Apenas leitura", Color.WARNING),
 ]
 
 
@@ -39,7 +39,9 @@ class _TrustCard(QFrame):
         icon_lbl.setFixedSize(28, 28)
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet(
-            f"color:{accent};font-size:16px;background:transparent;"
+            f"background-color:rgba(15,23,42,0.62);"
+            f"border:1px solid {accent};border-radius:{Rounded.SM}px;"
+            f"color:{accent};font-size:16px;font-weight:900;"
         )
         row.addWidget(icon_lbl)
 

@@ -29,10 +29,10 @@ from app.ui.widgets.circular_button import CircularStartButton
 STAGE_KEYS = ("system", "hardware", "bios", "updates")
 STAGE_INFO: dict[str, tuple[str, str, float]] = {
     # key: (icon, label, angle in degrees, 0=top, clockwise)
-    "system":   ("🖥", "Sistema",  0.0),
-    "hardware": ("🧬", "Hardware", 90.0),
-    "bios":     ("🎛", "BIOS",     180.0),
-    "updates":  ("⬇", "Updates",  270.0),
+    "system":   ("▰", "Sistema",  0.0),
+    "hardware": ("▣", "Hardware", 90.0),
+    "bios":     ("▥", "BIOS",     180.0),
+    "updates":  ("↓", "Updates",  270.0),
 }
 
 MARKER_RADIUS = 22  # raio dos marcadores
@@ -183,9 +183,12 @@ class OrbitalCircle(QWidget):
         painter.drawEllipse(QPointF(hx, hy), 5, 5)
 
         # 3) Marcadores nos 4 pontos cardinais
-        emoji_font = QFont("Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji", 14)
-        painter.setFont(emoji_font)
-        for key, (icon, _label, angle_deg) in STAGE_INFO.items():
+        icon_font = QFont("Inter, Segoe UI", 14)
+        icon_font.setBold(True)
+        label_font = QFont("Inter, Segoe UI", 10)
+        label_font.setBold(True)
+        painter.setFont(icon_font)
+        for key, (icon, label, angle_deg) in STAGE_INFO.items():
             state = self._states.get(key, "idle")
             mx, my = self._point_at(cx, cy, radius, angle_deg)
 
@@ -232,7 +235,23 @@ class OrbitalCircle(QWidget):
                 painter.drawPixmap(icon_rect, pixmap, source)
             else:
                 painter.setPen(text_color)
+                painter.setFont(icon_font)
                 painter.drawText(icon_rect, Qt.AlignCenter, icon)
+
+            label_distance = MARKER_RADIUS + 18
+            label_x, label_y = self._point_at(mx, my, label_distance, angle_deg)
+            label_color = QColor(
+                Color.ACCENT if state == "active"
+                else Color.SUCCESS if state == "done"
+                else Color.MUTED
+            )
+            painter.setPen(label_color)
+            painter.setFont(label_font)
+            painter.drawText(
+                QRectF(label_x - 58, label_y - 10, 116, 20),
+                Qt.AlignCenter,
+                label,
+            )
 
         painter.end()
 

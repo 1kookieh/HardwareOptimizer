@@ -23,9 +23,9 @@ from app.ui.tokens import Color, Rounded, Spacing
 
 OBJECTIVES: list[tuple[str, str, str]] = [
     # key, label, icon
-    ("fps", "FPS", "◎"),
-    ("input_lag", "Input lag", "⌖"),
-    ("stability", "Estabilidade", "🛡"),
+    ("fps", "FPS", "◉"),
+    ("input_lag", "Input lag", "ϟ"),
+    ("stability", "Estabilidade", "⬟"),
     ("balanced", "Balanceado", "⚖"),
 ]
 
@@ -35,12 +35,12 @@ def _btn_qss(selected: bool) -> str:
         return (
             f"QPushButton{{background-color:{Color.PRIMARY};"
             f"color:{Color.ON_PRIMARY};border:1px solid {Color.PRIMARY};"
-            f"border-radius:{Rounded.SM}px;padding:8px 14px;font-weight:700;font-size:13px;}}"
+            f"border-radius:{Rounded.SM}px;padding:10px 14px;font-weight:800;font-size:13px;}}"
         )
     return (
         f"QPushButton{{background-color:transparent;"
         f"color:{Color.MUTED};border:1px solid {Color.BORDER};"
-        f"border-radius:{Rounded.SM}px;padding:8px 14px;font-weight:600;font-size:13px;}}"
+        f"border-radius:{Rounded.SM}px;padding:10px 14px;font-weight:700;font-size:13px;}}"
         f"QPushButton:hover{{color:{Color.ON_SURFACE};border-color:{Color.ACCENT};}}"
     )
 
@@ -59,7 +59,7 @@ class ObjectiveSelector(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(Spacing.XS)
 
-        title = QLabel("Objetivo da análise")
+        title = QLabel("3. Objetivo da análise")
         title.setStyleSheet(
             f"color:{Color.ON_SURFACE};font-size:14px;font-weight:700;"
         )

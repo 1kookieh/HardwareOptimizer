@@ -26,13 +26,13 @@ from app.ui.widgets.effects import apply_drop_shadow
 
 
 PROFILE_ICONS: dict[str, str] = {
-    "games": "🎮",
+    "games": "✦",
     "development": "</>",
-    "video_editing": "🎬",
-    "general": "👤",
-    "high_performance": "⚡",
-    "stability": "🛡",
-    "low_power": "🍃",
+    "video_editing": "▥",
+    "general": "●",
+    "high_performance": "▲",
+    "stability": "⬟",
+    "low_power": "◒",
 }
 
 
@@ -184,7 +184,7 @@ class ProfilePicker(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(Spacing.SM)
 
-        title = QLabel("Escolha o perfil de análise")
+        title = QLabel("1. Escolha o perfil de análise")
         title.setStyleSheet(
             f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;"
         )

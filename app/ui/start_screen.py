@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QToolButton,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.models.profile import PROFILES
 from app.storage import GamesRegistry
 from app.ui.tokens import Color, Rounded, Spacing
 from app.ui.widgets import (
@@ -34,17 +34,123 @@ from app.ui.widgets import (
 
 def _info_card_qss(border: str) -> str:
     return (
-        f"#InfoCard{{background-color:{Color.SURFACE};"
-        f"border:1px solid {border};border-radius:{Rounded.MD}px;}}"
+        f"#InfoCard{{background-color:rgba(17,24,39,0.78);"
+        f"border:1px solid {border};border-radius:{Rounded.LG}px;}}"
     )
 
 
-def _section_card_qss() -> str:
+def _section_card_qss(border: str | None = None) -> str:
+    border_color = border or Color.BORDER
     return (
-        f"#SectionCard{{background-color:{Color.SURFACE};"
-        f"border:1px solid {Color.BORDER};"
-        f"border-radius:{Rounded.LG}px;}}"
+        f"#SectionCard{{"
+        f"background:qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+        f"stop:0 rgba(15, 23, 42, 0.96),"
+        f"stop:0.55 rgba(17, 24, 39, 0.90),"
+        f"stop:1 rgba(8, 47, 73, 0.42));"
+        f"border:1px solid {border_color};"
+        f"border-radius:{Rounded.XL}px;}}"
     )
+
+
+OBJECTIVE_LABELS = {
+    "fps": "FPS",
+    "input_lag": "Input lag",
+    "stability": "Estabilidade",
+    "balanced": "Balanceado",
+}
+
+
+class SessionSummaryPanel(QFrame):
+    """Resumo visual da seleção atual na coluna direita."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setObjectName("SectionCard")
+        self.setStyleSheet(_section_card_qss())
+        self.setAccessibleName("Resumo da sessão")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        layout.setSpacing(Spacing.MD)
+
+        title = QLabel("Resumo da sessão")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:800;")
+        layout.addWidget(title)
+
+        status = QLabel("●  Sessão pronta")
+        status.setStyleSheet(f"color:{Color.SUCCESS};font-size:14px;font-weight:800;")
+        layout.addWidget(status)
+
+        hint = QLabel("Tudo pronto para iniciar sua análise.")
+        hint.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
+        layout.addWidget(hint)
+
+        self.profile_row = self._meta_row("◈", "Perfil", "Jogos")
+        self.games_row = self._meta_row("▣", "Jogos", "Nenhum selecionado")
+        self.objective_row = self._meta_row("◎", "Objetivo", "FPS")
+        layout.addWidget(self.profile_row)
+        layout.addWidget(self.games_row)
+        layout.addWidget(self.objective_row)
+
+        layout.addStretch(1)
+
+        self.safe_mark = QLabel("✓")
+        self.safe_mark.setFixedSize(128, 128)
+        self.safe_mark.setAlignment(Qt.AlignCenter)
+        self.safe_mark.setStyleSheet(
+            f"background:qradialgradient(cx:0.5, cy:0.5, radius:0.65,"
+            f"fx:0.5, fy:0.5, stop:0 {Color.SUCCESS},"
+            f"stop:0.45 rgba(34,197,94,0.42),"
+            f"stop:1 rgba(34,197,94,0.05));"
+            f"border:2px solid {Color.SUCCESS};"
+            f"border-radius:64px;color:{Color.ON_PRIMARY};"
+            f"font-size:54px;font-weight:900;"
+        )
+        layout.addWidget(self.safe_mark, 0, Qt.AlignHCenter)
+
+        safe_title = QLabel("Ambiente seguro")
+        safe_title.setAlignment(Qt.AlignCenter)
+        safe_title.setStyleSheet(f"color:{Color.SUCCESS};font-size:15px;font-weight:900;")
+        layout.addWidget(safe_title)
+
+        safe_sub = QLabel("Pronto para análise local")
+        safe_sub.setAlignment(Qt.AlignCenter)
+        safe_sub.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
+        layout.addWidget(safe_sub)
+
+    def _meta_row(self, icon: str, label: str, value: str) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(Spacing.SM)
+        icon_lbl = QLabel(icon)
+        icon_lbl.setFixedWidth(22)
+        icon_lbl.setStyleSheet(f"color:{Color.ACCENT};font-size:13px;font-weight:800;")
+        layout.addWidget(icon_lbl)
+        label_lbl = QLabel(label)
+        label_lbl.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:12px;font-weight:700;")
+        layout.addWidget(label_lbl)
+        layout.addStretch(1)
+        value_lbl = QLabel(value)
+        value_lbl.setObjectName("SummaryValue")
+        value_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        value_lbl.setStyleSheet(f"color:{Color.MUTED};font-size:12px;font-weight:700;")
+        layout.addWidget(value_lbl)
+        return row
+
+    def update_values(self, profile: str, games: list[str], objective: str) -> None:
+        profile_label = PROFILES.get(profile).label if profile in PROFILES else profile
+        game_text = f"{len(games)} selecionado(s)" if games else "Nenhum selecionado"
+        objective_label = OBJECTIVE_LABELS.get(objective, objective)
+        self._set_value(self.profile_row, profile_label)
+        self._set_value(self.games_row, game_text)
+        self._set_value(self.objective_row, objective_label)
+
+    @staticmethod
+    def _set_value(row: QWidget, value: str) -> None:
+        label = row.findChild(QLabel, "SummaryValue")
+        if label is not None:
+            label.setText(value)
 
 
 class StartScreen(QWidget):
@@ -63,7 +169,7 @@ class StartScreen(QWidget):
         self._registry = registry or GamesRegistry()
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        outer.setContentsMargins(Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD)
         outer.setSpacing(Spacing.MD)
 
         outer.addWidget(self._build_top_bar(), 0)
@@ -82,21 +188,29 @@ class StartScreen(QWidget):
 
     # --- top bar -----------------------------------------------------------
     def _build_top_bar(self) -> QWidget:
-        bar = QWidget()
+        bar = QFrame()
+        bar.setObjectName("TopShell")
+        bar.setFixedHeight(64)
+        bar.setStyleSheet(
+            f"#TopShell{{background-color:rgba(11,17,32,0.92);"
+            f"border:1px solid rgba(51,65,85,0.45);"
+            f"border-radius:{Rounded.LG}px;}}"
+        )
         row = QHBoxLayout(bar)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(Spacing.SM)
+        row.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
+        row.setSpacing(Spacing.MD)
 
         # Brand block: icon + name + subtitle
         brand_box = QHBoxLayout()
         brand_box.setSpacing(Spacing.SM)
-        brand_icon = QLabel("⏻")
-        brand_icon.setFixedSize(36, 36)
+        brand_icon = QLabel("H")
+        brand_icon.setFixedSize(42, 42)
         brand_icon.setAlignment(Qt.AlignCenter)
         brand_icon.setStyleSheet(
-            f"background-color:{Color.SURFACE_ELEVATED};"
-            f"color:{Color.ACCENT};border-radius:{Rounded.SM}px;"
-            f"font-size:18px;font-weight:800;"
+            f"background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            f"stop:0 {Color.ACCENT}, stop:1 {Color.PRIMARY});"
+            f"color:{Color.ON_PRIMARY};border-radius:{Rounded.MD}px;"
+            f"font-size:22px;font-weight:900;"
         )
         brand_box.addWidget(brand_icon)
 
@@ -116,7 +230,7 @@ class StartScreen(QWidget):
         row.addLayout(brand_box)
         row.addStretch(1)
 
-        self.settings_btn = QPushButton("⚙   Configurações")
+        self.settings_btn = QPushButton("⚙  Configurações")
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.setAccessibleName("Configurações")
         self.settings_btn.setMinimumHeight(36)
@@ -130,17 +244,38 @@ class StartScreen(QWidget):
         self.settings_btn.clicked.connect(self._on_settings_clicked)
         row.addWidget(self.settings_btn)
 
-        # Light/dark toggle visual (still triggers parent signal)
+        row.addSpacing(Spacing.SM)
+
+        mode_label = QLabel("◌")
+        mode_label.setFixedSize(36, 36)
+        mode_label.setAlignment(Qt.AlignCenter)
+        mode_label.setStyleSheet(
+            f"background-color:{Color.SURFACE_ELEVATED};"
+            f"border:1px solid {Color.BORDER};"
+            f"border-radius:{Rounded.MD}px;color:{Color.ON_SURFACE};font-size:16px;"
+        )
+        row.addWidget(mode_label)
+
         self.theme_btn = QToolButton()
-        self.theme_btn.setText("☀ / 🌙")
+        self.theme_btn.setText("◐")
         self.theme_btn.setAccessibleName("Alternar tema")
         self.theme_btn.setCursor(Qt.PointingHandCursor)
         self.theme_btn.setStyleSheet(
-            f"QToolButton{{color:{Color.ACCENT};background:transparent;"
-            f"border:none;font-size:14px;padding:4px;}}"
+            f"QToolButton{{color:{Color.ACCENT};background-color:{Color.SURFACE_ELEVATED};"
+            f"border:1px solid {Color.BORDER};border-radius:{Rounded.MD}px;"
+            f"font-size:16px;padding:8px;}}"
+            f"QToolButton:hover{{border-color:{Color.ACCENT};}}"
         )
         self.theme_btn.clicked.connect(self.themeToggleRequested.emit)
         row.addWidget(self.theme_btn)
+
+        row.addSpacing(Spacing.SM)
+        for symbol in ("−", "□", "×"):
+            ctrl = QLabel(symbol)
+            ctrl.setFixedSize(32, 32)
+            ctrl.setAlignment(Qt.AlignCenter)
+            ctrl.setStyleSheet(f"color:{Color.MUTED};font-size:18px;font-weight:600;")
+            row.addWidget(ctrl)
 
         return bar
 
@@ -148,9 +283,9 @@ class StartScreen(QWidget):
     def _build_left(self) -> QWidget:
         wrapper = QFrame()
         wrapper.setObjectName("SectionCard")
-        wrapper.setStyleSheet(_section_card_qss())
-        wrapper.setMinimumWidth(440)
-        wrapper.setMaximumWidth(520)
+        wrapper.setStyleSheet(_section_card_qss(Color.PRIMARY))
+        wrapper.setMinimumWidth(390)
+        wrapper.setMaximumWidth(430)
         wrapper.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
         layout = QVBoxLayout(wrapper)
@@ -158,14 +293,19 @@ class StartScreen(QWidget):
         layout.setSpacing(Spacing.SM)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        title = QLabel("Inicie uma análise completa")
+        badge = QLabel("⬟  ANÁLISE LOCAL E SEGURA")
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setStyleSheet(f"color:{Color.ACCENT};font-size:12px;font-weight:900;")
+        layout.addWidget(badge)
+
+        title = QLabel("Análise completa do seu PC")
         title.setStyleSheet(
-            f"color:{Color.ON_SURFACE};font-size:18px;font-weight:700;"
+            f"color:{Color.ON_SURFACE};font-size:20px;font-weight:900;"
         )
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        sub = QLabel("Diagnóstico aprofundado do seu sistema")
+        sub = QLabel("Diagnóstico aprofundado e recomendações\n100% locais e seguras.")
         sub.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
         sub.setAlignment(Qt.AlignCenter)
         layout.addWidget(sub)
@@ -206,7 +346,7 @@ class StartScreen(QWidget):
         wrapper = QFrame()
         wrapper.setObjectName("SectionCard")
         wrapper.setStyleSheet(_section_card_qss())
-        wrapper.setMinimumWidth(540)
+        wrapper.setMinimumWidth(600)
         wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         layout = QVBoxLayout(wrapper)
@@ -215,6 +355,7 @@ class StartScreen(QWidget):
 
         self.profile_picker = ProfilePicker()
         self.profile_picker.profileChanged.connect(self._on_profile_changed)
+        self.profile_picker.profileChanged.connect(lambda _key: self._update_session_summary())
         layout.addWidget(self.profile_picker, 0)
 
         # Games block (revealed only for "games")
@@ -224,9 +365,11 @@ class StartScreen(QWidget):
         gb_layout.setSpacing(Spacing.MD)
         self.games_panel = GamesPanel(self._registry)
         self.games_panel.manageRequested.connect(self._on_manage_games)
+        self.games_panel.selectionChanged.connect(lambda _games: self._update_session_summary())
         gb_layout.addWidget(self.games_panel)
 
         self.objective_selector = ObjectiveSelector()
+        self.objective_selector.objectiveChanged.connect(lambda _objective: self._update_session_summary())
         gb_layout.addWidget(self.objective_selector)
         layout.addWidget(self.games_block, 0)
 
@@ -236,15 +379,29 @@ class StartScreen(QWidget):
     # --- right column: trust badges --------------------------------------
     def _build_right(self) -> QWidget:
         wrapper = QWidget()
-        wrapper.setMinimumWidth(200)
-        wrapper.setMaximumWidth(220)
+        wrapper.setMinimumWidth(280)
+        wrapper.setMaximumWidth(330)
         wrapper.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
         layout = QVBoxLayout(wrapper)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(TrustBadgesColumn())
+        principles = QFrame()
+        principles.setObjectName("SectionCard")
+        principles.setStyleSheet(_section_card_qss())
+        pl = QVBoxLayout(principles)
+        pl.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        pl.setSpacing(Spacing.MD)
+        title = QLabel("Princípios do HardwareOptimizer")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:15px;font-weight:800;")
+        title.setWordWrap(True)
+        pl.addWidget(title)
+        pl.addWidget(TrustBadgesColumn())
+        layout.addWidget(principles)
+
+        self.session_summary = SessionSummaryPanel()
+        layout.addWidget(self.session_summary, 1)
         layout.addStretch(1)
         return wrapper
 
@@ -277,12 +434,21 @@ class StartScreen(QWidget):
         self.status_label.setWordWrap(True)
         row.addWidget(self.status_label, 1)
 
+        local = QLabel("⬟  Análise 100% local")
+        local.setStyleSheet(f"color:{Color.MUTED};font-size:12px;font-weight:700;")
+        row.addWidget(local)
+
+        version = QLabel("Versão 1.0.0")
+        version.setStyleSheet(f"color:{Color.MUTED};font-size:12px;font-weight:700;")
+        row.addWidget(version)
+
         return bar
 
     # --- handlers ----------------------------------------------------------
     def _on_profile_changed(self, key: str) -> None:
         is_games = key == "games"
         self.games_block.setVisible(is_games)
+        self._update_session_summary()
 
     def _on_start_clicked(self) -> None:
         if self.start_button.is_running():
@@ -301,6 +467,15 @@ class StartScreen(QWidget):
         else:
             # Mesmo se fechar via Close, o registry pode ter mudado
             self.games_panel.refresh()
+        self._update_session_summary()
+
+    def _update_session_summary(self) -> None:
+        if not hasattr(self, "session_summary"):
+            return
+        profile = self.profile_picker.selected_profile()
+        games = self.games_panel.selected_games() if profile == "games" else []
+        objective = self.objective_selector.selected()
+        self.session_summary.update_values(profile, games, objective)
 
     # --- public API used by MainWindow ------------------------------------
     def set_running(self, running: bool) -> None:
