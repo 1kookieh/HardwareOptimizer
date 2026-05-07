@@ -1,108 +1,115 @@
 # HardwareOptimizer
 
-HardwareOptimizer é um app desktop local-first para Windows que analisa hardware, sistema, BIOS/UEFI, drivers e updates para gerar recomendações explicáveis de otimização, estabilidade e segurança.
-
-> Importante: o app é advisory-first. Ele lê o máximo que o Windows, o firmware, ferramentas oficiais e fontes online oficiais expõem, mas nunca altera BIOS/UEFI, drivers, registro, overclock, undervolt, voltagem, frequência, fan curve ou power limit automaticamente.
-
 [![CI](https://github.com/1kookieh/HardwareOptimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/1kookieh/HardwareOptimizer/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
+![SQLite](https://img.shields.io/badge/Storage-SQLite-003B57?logo=sqlite&logoColor=white)
+![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)
+![Status](https://img.shields.io/badge/status-MVP%20ativo-2563EB)
+![Safety](https://img.shields.io/badge/mode-advisory--first-22C55E)
 
-## Status do MVP
+HardwareOptimizer é um app desktop local-first para Windows que analisa hardware, Windows, BIOS/UEFI, drivers e atualizações para gerar recomendações explicáveis de otimização, estabilidade e segurança.
 
-- Interface desktop em PySide6 com tela inicial premium em 3 colunas: painel de análise com orbit/radar, seleção de perfil/jogos/objetivo e coluna de princípios + resumo da sessão. Tema dark/light alternável e layout compacto abaixo de 960px.
-- Assets visuais locais em SVG para logo, perfis, princípios, jogos e orbit; a UI não depende de CDN, URLs externas ou imagens baixadas em tempo de execução.
-- Durante a coleta, o botão circular permite cancelar a análise: ao passar o mouse, o CTA muda para "PARAR"; ao clicar, a UI volta imediatamente para "ANALISAR PC" e ignora qualquer resultado tardio da coleta cancelada.
-- O anel orbital da tela inicial aceita ícones personalizados em `app/ui/assets/orbit/` (`system`, `hardware`, `bios`, `updates`) sem trocar código; quando não há arquivo, usa fallback visual.
-- A lista de jogos aparece com slide-down animado apenas quando o perfil "Jogos" está selecionado.
-- Atalhos de teclado: `F5` ou `Ctrl+R` iniciam análise, `Esc` volta para a tela inicial, `Ctrl+T` alterna tema, `Ctrl+E` exporta JSON, `Ctrl+Shift+E` exporta HTML.
-- Coleta read-only em modo de detecção máxima, sem UAC, prompts ou mudanças no sistema.
-- Coleta executada em thread separada (QThread) com barra de progresso por etapa: Sistema → Hardware → BIOS/UEFI → Atualizações locais → Fontes oficiais online. A janela permanece responsiva durante todo o processo.
-- Leitura de configurações detalhadas de BIOS quando o fabricante expõe via WMI.
-- Consulta de fontes oficiais online para Windows Update, drivers e suporte/BIOS.
-- Estados vazios básicos em histórico e tabelas sem recomendações, evitando telas aparentemente quebradas.
-- Tabelas de recomendações com colunas fixas, cabeçalhos não movíveis e ordenação por coluna.
-- Dashboard pós-análise com resumo, maior ponto de atenção, próxima ação segura e top 3 prioridades.
-- Engine determinística de recomendações por perfil.
-- A engine registra a versão do `docs/recommendation_quality_spec.md` usada como referência de qualidade para recomendações.
-- Exportação de relatório JSON/HTML.
+> O projeto é advisory-first: ele coleta evidências e orienta ações manuais, mas nunca altera BIOS/UEFI, registro, drivers, overclock, undervolt, voltagem, frequência, fan curve, plano de energia ou power limit automaticamente.
+
+## Visão Geral
+
+O app foi pensado para pessoas que querem entender o estado real do PC antes de mexer em configurações sensíveis. A coleta é local, read-only e sem UAC. As recomendações são determinísticas, priorizadas por perfil e acompanhadas de evidências, risco, confiança, passos manuais, validação e rollback quando aplicável.
+
+Fluxo principal:
+
+1. Escolha um perfil de análise.
+2. Selecione jogos quando o perfil for Jogos.
+3. Defina o objetivo da análise.
+4. Inicie a coleta local.
+5. Revise hardware, BIOS/UEFI, atualizações, jogos, histórico e recomendações.
+6. Exporte um relatório JSON ou HTML.
+
+## Funcionalidades
+
+- UI desktop em PySide6 com tema dark/light, tela inicial premium, dashboard pós-análise, sidebar, cards de resumo e tabelas organizadas.
+- Botão central de análise com cancelamento imediato pela UI: ao clicar em "PARAR", a interface volta para o estado pronto e ignora resultados tardios da coleta cancelada.
+- Coleta read-only de sistema, CPU, RAM, GPU, storage, placa-mãe, BIOS/UEFI, TPM, Secure Boot, boot mode, virtualização, Hyper-V, VBS/HVCI, Fast Startup, hibernação, sensores opcionais e atualizações.
+- Detecção de BIOS detalhada quando o fabricante expõe dados via WMI, incluindo Lenovo, HP e Dell.
+- Enriquecimento online somente com fontes oficiais quando há fabricante reconhecido.
+- Perfis de análise: Jogos, Desenvolvimento, Edição de Vídeo, Uso Geral, Alto Desempenho, Estabilidade e Baixo Consumo.
+- Jogos suportados: Valorant, League of Legends, Call of Duty / Warzone, Marvel Rivals, Fortnite e Counter-Strike 2.
+- Engine determinística de recomendações com guard ativo de segurança.
+- Exportação de relatórios em JSON e HTML.
 - Histórico local em SQLite.
-- Logs locais com rotação em `%LOCALAPPDATA%/HardwareOptimizer/logs/app.log` (5 arquivos × 1 MB).
-- Testes automatizados para modelos, coleta, recomendações, segurança, relatórios, storage, detecções e regressão de encoding.
+- Logs locais com rotação em `%LOCALAPPDATA%/HardwareOptimizer/logs/app.log`.
+- Testes automatizados com I/O externo mockado por padrão.
 
-## Screenshots
+## Stack
 
-Os screenshots oficiais ainda não foram capturados.
-
-- `docs/screenshots/dashboard.png` - Dashboard após análise.
-- `docs/screenshots/recommendations.png` - Recomendações com risco/prioridade.
-- `docs/screenshots/updates.png` - Aba de Atualizações.
-- `docs/screenshots/bios.png` - Recomendações BIOS/UEFI.
-
-## Perfis
-
-| Perfil | Foco |
+| Área | Tecnologia |
 | --- | --- |
-| Jogos | FPS consistente, input lag, compatibilidade com anti-cheat e estabilidade prática. |
-| Desenvolvimento | WSL2, Docker, virtualização, estabilidade e produtividade. |
-| Edição de Vídeo | GPU/driver, armazenamento, RAM e estabilidade em cargas longas. |
-| Uso Geral | Recomendações equilibradas e de baixo risco. |
-| Alto Desempenho | Energia, BIOS e Windows com foco em performance, sem OC automático. |
-| Estabilidade | Updates, drivers, Fast Startup, armazenamento e configurações conservadoras. |
-| Baixo Consumo | Menor consumo e menor ruído, preservando segurança. |
+| Linguagem | Python 3.11+ |
+| Interface | PySide6 / Qt |
+| Sistema operacional alvo | Windows 10/11 |
+| Coleta local | `psutil`, WMI, PowerShell, COM Windows Update, registro em modo leitura |
+| Persistência | SQLite |
+| Relatórios | JSON e HTML |
+| Testes | pytest |
+| Lint e tipos | Ruff e mypy configurados em `pyproject.toml` |
+| Build desktop | PyInstaller via `scripts/build.ps1` |
+| CI | GitHub Actions |
 
-Jogos suportados no perfil Jogos: Valorant, League of Legends, Call of Duty / Warzone, Marvel Rivals, Fortnite e Counter-Strike 2.
+## O Que É Detectado
 
-## O que é detectado
-
-| Área | Dados coletados | Método |
+| Área | Dados coletados | Método principal |
 | --- | --- | --- |
 | Sistema | SO, versão, build, arquitetura, hostname e plano de energia | `platform`, `socket`, `powercfg` |
 | CPU | Nome, núcleos, threads, frequência e fabricante | `psutil`, WMI `Win32_Processor` |
 | RAM | Total, uso, módulos, part number, clock configurado, speed nominal e form factor | `psutil`, WMI `Win32_PhysicalMemory` |
-| GPU | Nome, driver, VRAM e Resizable BAR | WMI `Win32_VideoController`, `nvidia-smi`, PowerShell PnP |
+| GPU | Nome, driver, VRAM e Resizable BAR | WMI, `nvidia-smi`, PowerShell PnP |
 | Placa-mãe | Fabricante e modelo | WMI `Win32_BaseBoard` |
-| Armazenamento | Partições, filesystem, total/usado e modo AHCI/RAID quando detectável | `psutil`, PowerShell/WMI |
-| BIOS/UEFI | Fabricante, versão, data, Secure Boot, TPM, TPM version, virtualização, boot mode | WMI, `Confirm-SecureBootUEFI`, `Get-Tpm`, `Get-ComputerInfo` |
-| BIOS detalhada | Configurações expostas pelo fabricante, como Secure Boot, virtualization, boot, power e outros nomes publicados via WMI | Lenovo `root\wmi`, HP `root\hp\instrumentedBIOS`, Dell `root\dcim\sysman` |
-| Firmware | Presença de tabelas Raw SMBIOS, ACPI e Firmware expostas ao Windows | `EnumSystemFirmwareTables` |
-| Segurança/virtualização | Hyper-V, VBS e HVCI/Memory Integrity | `Get-WindowsOptionalFeature`, WMI `root\Microsoft\Windows\DeviceGuard` |
-| Energia/boot | Fast Startup e hibernação | Registro Windows, `powercfg /a` |
-| Sensores | Temperatura/clock/voltagem quando disponível | WMI `root\LibreHardwareMonitor` |
-| Updates | Reboot pendente, último hotfix, updates disponíveis e drivers antigos | Registro, `Get-HotFix`, COM `Microsoft.Update.Session`, WMI `Win32_PnPSignedDriver` |
+| Storage | Partições, filesystem, uso e modo AHCI/RAID quando detectável | `psutil`, PowerShell, WMI |
+| BIOS/UEFI | Fabricante, versão, data, Secure Boot, TPM, boot mode e virtualização | WMI, `Confirm-SecureBootUEFI`, `Get-Tpm`, `Get-ComputerInfo` |
+| BIOS detalhada | Configurações expostas pelo fabricante | WMI Lenovo/HP/Dell quando disponível |
+| Segurança | Hyper-V, VBS e HVCI/Memory Integrity | PowerShell e WMI Device Guard |
+| Energia e boot | Fast Startup e hibernação | Registro Windows e `powercfg /a` |
+| Sensores | Temperatura, clock e voltagem quando disponíveis | WMI `root\LibreHardwareMonitor` |
+| Atualizações | Reboot pendente, último hotfix, updates disponíveis e drivers antigos | Registro, `Get-HotFix`, COM `Microsoft.Update.Session`, WMI |
 
-Dados ausentes aparecem como "Não detectado automaticamente." Quando a BIOS não publica uma configuração para o Windows, o app mostra "Não exposto pelo firmware ou pelo sistema operacional." Isso é intencional: o app não inventa estado de BIOS, sensor, driver ou compatibilidade.
+Dados ausentes aparecem como "Não detectado automaticamente." Quando uma configuração de BIOS não é exposta ao Windows, o app trata isso como limitação real do firmware e não inventa estado.
 
-### Fontes oficiais online
+## Recomendações
 
-O enriquecimento online só usa páginas oficiais. Quando o fabricante da placa-mãe ou da BIOS é reconhecido (ASUS, Gigabyte, MSI, ASRock, Biostar, EVGA, Lenovo, Dell, HP, Acer, Samsung, LG, Intel, AMI, Phoenix, Insyde, Supermicro, NZXT), o app aponta para a página oficial de suporte do vendor. Se o vendor não é reconhecido, o campo `bios_lookup_url` permanece como "Não detectado automaticamente." O app nunca cai em buscador externo (Google/Bing) para evitar vazamento de modelo da placa-mãe a terceiros.
+Cada recomendação pode incluir:
 
-## O que é recomendado
+- título, categoria, prioridade, risco e confiança;
+- justificativa e evidências usadas;
+- estado atual e estado recomendado;
+- benefício esperado sem promessa de ganho exato;
+- impacto, quando não aplicar e nota de segurança;
+- passos manuais, validação e rollback quando aplicável.
+
+Categorias cobertas:
 
 | Categoria | Exemplos | Risco típico |
 | --- | --- | --- |
 | BIOS/UEFI | XMP/EXPO/DOCP, Resizable BAR, modo RAID/AHCI, boost/PBO/Turbo, update de BIOS com cautela | `review` ou `risky` |
 | Segurança | Secure Boot, TPM, VBS/HVCI como trade-off explícito | `safe` a `risky` |
 | Windows | Plano de energia, apps em background, Fast Startup no perfil estabilidade | `safe` |
-| Updates | Reinício pendente, Windows Update, hotfix antigo | `safe` |
-| Drivers | GPU e drivers antigos com verificação manual no site oficial | `review` |
-| Hardware | RAM insuficiente, armazenamento quase cheio | `safe` ou `review` |
-| Jogos | HAGS, anti-cheat, ajustes competitivos e validação prática | `safe` ou `review` |
+| Atualizações | Reinício pendente, Windows Update, hotfix antigo | `safe` |
+| Drivers | GPU, chipset e drivers antigos com verificação manual no site oficial | `review` |
+| Hardware | RAM insuficiente, armazenamento quase cheio e gargalos prováveis | `safe` ou `review` |
+| Jogos | HAGS, anti-cheat, input lag, estabilidade e validação prática | `safe` ou `review` |
 
-Cada recomendação inclui título, categoria, prioridade, risco, justificativa, estado atual, estado recomendado, benefício esperado, impacto, quando não aplicar, validação, nota de segurança, passos manuais, evidência, rollback, confiança e confirmação manual quando necessário.
+O padrão de qualidade das recomendações fica documentado em [`docs/recommendation_quality_spec.md`](docs/recommendation_quality_spec.md). A engine registra essa referência nos relatórios para auditoria.
 
-O arquivo `docs/recommendation_quality_spec.md` documenta o padrão esperado de qualidade das recomendações. A engine referencia esse arquivo em `detection_sources` com caminho e hash SHA-256, e os relatórios JSON incluem `recommendation_quality_spec` para auditoria.
+## Interface
 
-## Como funciona a checagem de updates e internet
+- Tela inicial com layout em três áreas: painel de análise, seleção de perfil/jogos/objetivo e resumo de segurança.
+- Dashboard após análise com visão geral, maior ponto de atenção, próxima ação segura e principais prioridades.
+- Abas para Hardware, Recomendações, BIOS/UEFI, Jogos, Atualizações e Histórico.
+- Tabelas com cabeçalhos fixos, colunas organizadas e status de recomendação.
+- Ícones locais em SVG para evitar dependência de CDN ou URLs externas.
+- Assets opcionais de jogos em `app/ui/assets/games/` e ícones opcionais do orbit em `app/ui/assets/orbit/`.
 
-A checagem é somente leitura:
-
-- Reboot pendente: verifica chaves de registro conhecidas do Windows Update, Component Based Servicing e `PendingFileRenameOperations`.
-- Último hotfix: usa `Get-HotFix`, ordena por data e calcula idade em dias.
-- Updates disponíveis: usa COM `Microsoft.Update.Session` para contar updates de software não instalados. Pode demorar 30-60s e falhar em máquinas bloqueadas por política.
-- Drivers antigos: consulta `Win32_PnPSignedDriver` e lista drivers relevantes com data acima de aproximadamente 3 anos.
-- Fontes oficiais online: testa acesso a Microsoft Update Catalog, página oficial do Windows e páginas oficiais de driver conforme GPU detectada.
-- BIOS/suporte: aponta para fonte oficial do fabricante quando reconhecida, sem baixar firmware nem executar atualização.
-
-O app não baixa, instala, remove nem atualiza nada automaticamente.
+Screenshots oficiais ainda não foram versionados. Quando capturados, devem ficar em `docs/screenshots/`.
 
 ## Instalação
 
@@ -111,21 +118,19 @@ Requisitos:
 - Windows 10/11.
 - Python 3.11+.
 
-```powershell
-py -m pip install -r requirements.txt
-```
-
-Runtime apenas:
+Runtime:
 
 ```powershell
 py -m pip install -r requirements.txt
 ```
 
-Desenvolvimento (inclui pytest, ruff, mypy, pyinstaller):
+Desenvolvimento:
 
 ```powershell
-py -m pip install -r requirements-dev.txt
+py -m pip install -r requirements.txt -r requirements-dev.txt
 ```
+
+O projeto não exige variáveis de ambiente obrigatórias para o MVP atual.
 
 ## Executar
 
@@ -133,37 +138,30 @@ py -m pip install -r requirements-dev.txt
 py -m app.main
 ```
 
-## Testes
+## Validação
 
-Suíte rápida (default, com I/O mockado, < 1s):
+Suíte rápida, com I/O externo mockado por padrão:
 
 ```powershell
 py -m pytest -q
 ```
 
-A configuração do pytest, ruff e mypy fica centralizada em `pyproject.toml`.
-O pytest usa `tool.pytest.ini_options` e pula testes de integração por padrão.
-
-Suíte de integração (toca WMI, PowerShell, registro e HTTP reais; 30–60s):
+Testes de integração, que podem tocar WMI, PowerShell, registro e HTTP reais:
 
 ```powershell
 py -m pytest -m integration
 ```
 
-Tudo (rápido + integração):
-
-```powershell
-py -m pytest -m "integration or not integration"
-```
-
-Comandos opcionais quando configurados:
+Lint e typecheck:
 
 ```powershell
 py -m ruff check .
 py -m mypy app tests
 ```
 
-## Empacotar
+No CI, Ruff e mypy existem como verificações não bloqueantes enquanto o baseline técnico evolui.
+
+## Build
 
 ```powershell
 .\scripts\build.ps1
@@ -172,58 +170,53 @@ py -m mypy app tests
 
 O executável é gerado em `dist/HardwareOptimizer/HardwareOptimizer.exe`.
 
-Antivírus podem sinalizar binários PyInstaller por reputação. Não desabilite ferramentas de segurança; para distribuição pública, prefira assinatura digital e documentação clara.
-
-## Relatórios e histórico
-
-- JSON e HTML são exportados localmente pela UI.
-- O histórico fica em `%LOCALAPPDATA%/HardwareOptimizer/history.sqlite`.
-- Não há telemetry, upload em nuvem ou coleta de documentos pessoais.
+Binários empacotados com PyInstaller podem receber alertas de reputação por antivírus. Para distribuição pública, o caminho recomendado é assinatura digital, documentação clara e distribuição por canal confiável, não desativar ferramentas de segurança.
 
 ## Estrutura
 
 ```text
 app/
   collectors/       coleta read-only de sistema, hardware, BIOS, sensores e updates
-                    (helper compartilhado em _powershell.py)
   models/           dataclasses normalizadas
-  recommendations/  engine determinística e regras por área
+  recommendations/  engine determinística e regras por categoria
   reports/          exportação JSON/HTML
-  safety/           ações bloqueadas e guard ativo na engine
-                    (filtra promessas de FPS exato, downgrade de BIOS, etc.)
-  storage/          SQLite de histórico
-  ui/               PySide6
+  safety/           ações bloqueadas e filtro ativo de segurança
+  storage/          histórico local em SQLite
+  ui/               interface PySide6, widgets e tokens visuais
+docs/               especificações técnicas versionadas
+scripts/            build e utilitários de manutenção
 tests/              testes automatizados
-scripts/            build PyInstaller
-CLAUDE.md           instruções originais do projeto
-DESIGN.md           design system
 ```
 
-## Limitações conhecidas
+Arquivos locais de instrução de agentes e design, como `AGENTS.md`, `CLAUDE.md` e `DESIGN.md`, podem existir no workspace, mas ficam fora dos commits por regra do projeto.
 
-- BIOS/UEFI raramente expõe todos os estados para o Windows; o app lê interfaces públicas e WMI de fabricante quando existem, e marca o restante como não exposto.
-- Caminhos exatos de menu de BIOS não são informados sem evidência de fabricante/modelo.
-- Sensores dependem do LibreHardwareMonitor rodando e expondo WMI.
-- Windows Update COM pode demorar ou falhar por política corporativa.
-- Driver "mais recente" exige verificação no site oficial do fabricante; o app apenas identifica sinais de driver antigo.
+## Segurança e Privacidade
+
+- Nenhuma alteração privilegiada é aplicada automaticamente.
+- O app não coleta documentos pessoais, credenciais, tokens, histórico do navegador ou arquivos privados.
+- O histórico fica em `%LOCALAPPDATA%/HardwareOptimizer/history.sqlite`.
+- Não há telemetry, upload em nuvem ou envio de inventário de hardware para terceiros.
+- Consultas online são limitadas a fontes oficiais quando o fabricante é reconhecido.
+- O app não recomenda downgrade de BIOS.
+- Update de BIOS só pode ser recomendado com modelo de placa-mãe e versão atual identificados.
 - Recomendações de jogos não prometem ganho exato de FPS.
-- Update de BIOS nunca é recomendado sem modelo exato da placa-mãe e versão atual identificados; downgrade nunca é recomendado.
 
-## Regras de segurança
+## Limitações Conhecidas
 
-- Não aplicar alterações destrutivas ou privilegiadas automaticamente.
-- Não recomendar desabilitar Secure Boot, TPM, firewall, antivírus ou proteções de memória como tweak genérico.
-- Não automatizar BIOS/UEFI, OC/UV, voltagem, frequência, power limit, driver ou registro.
-- Marcar incerteza como não detectada ou não exposta, sem fingir certeza.
-- Preferir evidência, risco, confiança, validação e rollback a promessas de ganho.
+- BIOS/UEFI raramente expõe todas as configurações ao Windows.
+- Sensores dependem do LibreHardwareMonitor expondo WMI.
+- Windows Update COM pode demorar ou falhar por política corporativa.
+- Estado "driver mais recente" exige confirmação em fonte oficial do fabricante.
+- Caminhos exatos de menus de BIOS variam por fabricante/modelo e não são inventados.
 
-## Fluxo de uso
+## Status do Projeto
 
-1. Abra o app com `py -m app.main`.
-2. Escolha um perfil.
-3. Se usar o perfil Jogos, selecione os jogos relevantes.
-4. Clique em "Analisar computador".
-5. Se precisar interromper, passe o mouse sobre o botão central e clique em "PARAR".
-6. Revise as abas Hardware, Atualizações, BIOS/UEFI, Jogos e Recomendações.
-7. Marque recomendações como pendentes, aplicadas ou ignoradas.
-8. Exporte JSON/HTML se quiser guardar ou compartilhar o diagnóstico.
+MVP ativo, com foco em qualidade de coleta, segurança das recomendações e evolução da interface. A licença declarada no `pyproject.toml` é proprietária; não há arquivo `LICENSE` público neste repositório no momento.
+
+Próximos passos sugeridos:
+
+- versionar screenshots reais em `docs/screenshots/`;
+- separar `MainWindow` em controller e views menores;
+- melhorar empty states e mensagens de erro;
+- paralelizar consultas HTTP de fontes oficiais;
+- expandir documentação de arquitetura e contribuição.
