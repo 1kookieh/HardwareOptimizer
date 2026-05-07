@@ -1,12 +1,16 @@
 """Painel de jogos com grid de cards e botão de gerenciamento.
 
-Os jogos disponíveis vêm de :class:`app.storage.GamesRegistry`, que mescla
-defaults com customizações persistidas pelo usuário. O botão
-"Gerenciar lista" abre um diálogo para adicionar/remover.
+Os jogos disponíveis vêm de :class:`app.storage.GamesRegistry`. Cada
+card tenta carregar um arquivo de logo de
+``app/ui/assets/games/{key}.(png|svg)``; quando ausente, usa um
+emoji-fallback configurável e o badge curto vem do registry.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from pathlib import Path
+
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -30,6 +34,33 @@ GAME_BADGE_ACCENTS: dict[str, str] = {
     "fortnite": "#7C3AED",
     "cs2": "#22C55E",
 }
+
+# Emoji fallback quando não há arquivo de logo. Genéricos / temáticos.
+GAME_FALLBACK_EMOJI: dict[str, str] = {
+    "valorant": "🎯",
+    "league_of_legends": "⚔",
+    "cod_warzone": "🎖",
+    "marvel_rivals": "🦸",
+    "fortnite": "🌪",
+    "cs2": "🔫",
+}
+
+
+_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets" / "games"
+
+
+def _load_icon_pixmap(key: str, size: int = 36) -> QPixmap | None:
+    for suffix in (".png", ".svg", ".jpg", ".jpeg"):
+        candidate = _ASSETS_DIR / f"{key}{suffix}"
+        if candidate.exists():
+            pix = QPixmap(str(candidate))
+            if not pix.isNull():
+                return pix.scaled(
+                    QSize(size, size),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+    return None
 
 
 def _card_qss(selected: bool) -> str:
@@ -57,14 +88,8 @@ class _GameCard(QFrame):
         layout.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
         layout.setSpacing(Spacing.SM)
 
-        badge = QLabel(entry.badge)
-        badge.setFixedSize(36, 36)
-        badge.setAlignment(Qt.AlignCenter)
-        badge.setStyleSheet(
-            f"background-color:{accent};color:{Color.ON_PRIMARY};"
-            f"border-radius:{Rounded.SM}px;font-weight:800;font-size:12px;"
-        )
-        layout.addWidget(badge)
+        icon_widget = self._build_icon(entry, accent)
+        layout.addWidget(icon_widget)
 
         text = QLabel(entry.label)
         text.setStyleSheet(
@@ -82,6 +107,45 @@ class _GameCard(QFrame):
         layout.addWidget(self.checkbox, 0, Qt.AlignRight)
 
         self._apply_style(False)
+
+    def _build_icon(self, entry: GameEntry, accent: str) -> QWidget:
+        pix = _load_icon_pixmap(entry.key, size=36)
+        if pix is not None:
+            container = QFrame()
+            container.setFixedSize(40, 40)
+            container.setStyleSheet(
+                f"background-color:{Color.SURFACE};"
+                f"border:1px solid {accent};"
+                f"border-radius:{Rounded.SM}px;"
+            )
+            inner = QVBoxLayout(container)
+            inner.setContentsMargins(2, 2, 2, 2)
+            inner.setSpacing(0)
+            label = QLabel()
+            label.setPixmap(pix)
+            label.setAlignment(Qt.AlignCenter)
+            label.setStyleSheet("background:transparent;border:none;")
+            inner.addWidget(label)
+            return container
+
+        # Fallback: emoji grande + sigla pequena
+        emoji = GAME_FALLBACK_EMOJI.get(entry.key, "🎮")
+        container = QFrame()
+        container.setFixedSize(40, 40)
+        container.setStyleSheet(
+            f"background-color:{accent};"
+            f"border-radius:{Rounded.SM}px;"
+        )
+        inner = QVBoxLayout(container)
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.setSpacing(0)
+        emoji_lbl = QLabel(emoji)
+        emoji_lbl.setAlignment(Qt.AlignCenter)
+        emoji_lbl.setStyleSheet(
+            f"color:{Color.ON_PRIMARY};font-size:18px;background:transparent;border:none;"
+        )
+        inner.addWidget(emoji_lbl)
+        return container
 
     def mousePressEvent(self, event):  # noqa: N802
         if event.button() == Qt.LeftButton:
@@ -121,7 +185,6 @@ class GamesPanel(QWidget):
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._outer.setSpacing(Spacing.SM)
 
-        # Header
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(Spacing.XS)
@@ -161,12 +224,10 @@ class GamesPanel(QWidget):
         self._populate()
 
     def _populate(self) -> None:
-        # Clear current cards
         for card in self._cards.values():
             card.setParent(None)
             card.deleteLater()
         self._cards.clear()
-        # Clear grid
         while self._grid.count():
             item = self._grid.takeAt(0)
             if item is not None and item.widget() is not None:
@@ -180,7 +241,6 @@ class GamesPanel(QWidget):
             self._grid.addWidget(card, index // cols, index % cols)
 
     def refresh(self) -> None:
-        """Reconstrói a grid após mudanças no registry."""
         self._populate()
         self.selectionChanged.emit(self.selected_games())
 
@@ -191,9 +251,7 @@ class GamesPanel(QWidget):
         return [k for k, c in self._cards.items() if c.is_checked()]
 
     def set_visible_panel(self, visible: bool) -> None:
-        """Mostra ou esconde os cards (sem animação para simplificar)."""
         self._grid_container.setVisible(visible)
 
-    # Compat com API anterior
     def reveal(self, show: bool) -> None:
         self.setVisible(show)

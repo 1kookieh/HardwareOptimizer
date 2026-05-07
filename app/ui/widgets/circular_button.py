@@ -100,14 +100,17 @@ class CircularStartButton(QAbstractButton):
         cx, cy = rect.center().x(), rect.center().y()
         radius = min(cx, cy) - 26  # margem para o ring externo
 
-        # ----- ring de pulso externo
-        ring_color_hex = Color.SCAN_ACTIVE if self._is_running else Color.ACCENT
-        ring_color = QColor(ring_color_hex)
-        ring_color.setAlpha(int(160 * (1 - self._pulse)))
-        ring_radius = radius + 4 + 22 * self._pulse
-        painter.setPen(QPen(ring_color, 3))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawEllipse(QPointF(cx, cy), ring_radius, ring_radius)
+        # ----- pulse interno suave (a animação principal vem do orbit em volta)
+        if self._is_running:
+            inner_ring = QColor(Color.SCAN_ACTIVE)
+            inner_ring.setAlphaF(0.30 + 0.25 * (1 - self._pulse))
+            painter.setPen(QPen(inner_ring, 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(
+                QPointF(cx, cy),
+                radius - 2 - 8 * self._pulse,
+                radius - 2 - 8 * self._pulse,
+            )
 
         # ----- borda estática fina
         painter.setPen(QPen(QColor(Color.BORDER), 1))
