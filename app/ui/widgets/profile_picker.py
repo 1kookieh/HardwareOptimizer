@@ -1,14 +1,14 @@
 """Seletor de perfil em cartões clicáveis com accent color por perfil.
 
-Cada cartão expõe label e descrição curta. O perfil selecionado emite
-``profileChanged(key)``. Usado na tela inicial.
+Layout em grid 3 colunas: cada card mostra ícone, label, descrição curta
+e um indicador de seleção (badge com check) no canto superior direito.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -20,15 +20,37 @@ from app.models.profile import PROFILES
 from app.ui.tokens import Color, PROFILE_ACCENTS, Rounded, Spacing
 
 
+PROFILE_ICONS: dict[str, str] = {
+    "games": "🎮",
+    "development": "</>",
+    "video_editing": "🎬",
+    "general": "👤",
+    "high_performance": "⚡",
+    "stability": "🛡",
+    "low_power": "🍃",
+}
+
+
 def _card_qss(accent: str, selected: bool) -> str:
     border_color = accent if selected else Color.BORDER
     bg = Color.SURFACE_ELEVATED if selected else Color.SURFACE
+    border_width = 2 if selected else 1
     return (
-        f"QPushButton{{background-color:{bg};color:{Color.ON_SURFACE};"
-        f"border:2px solid {border_color};border-radius:{Rounded.LG}px;"
-        f"padding:{Spacing.MD}px {Spacing.MD}px;text-align:left;font-weight:600;}}"
-        f"QPushButton:hover{{border-color:{Color.ACCENT};background-color:{Color.SURFACE_ELEVATED};}}"
-        f"QPushButton:focus{{outline:none;border-color:{Color.ACCENT};}}"
+        f"#ProfileCard{{background-color:{bg};"
+        f"border:{border_width}px solid {border_color};"
+        f"border-radius:{Rounded.LG}px;}}"
+        f"#ProfileCard:hover{{border-color:{accent};"
+        f"background-color:{Color.SURFACE_ELEVATED};}}"
+        f"#ProfileCard:focus{{outline:none;border-color:{accent};}}"
+    )
+
+
+def _badge_qss(accent: str, visible: bool) -> str:
+    if not visible:
+        return "background:transparent;border:none;"
+    return (
+        f"background-color:{accent};color:{Color.ON_PRIMARY};"
+        f"border-radius:10px;font-size:11px;font-weight:800;"
     )
 
 
@@ -37,18 +59,59 @@ class _ProfileCard(QPushButton):
         super().__init__(parent)
         self.key = key
         self.accent = accent
+        self.setObjectName("ProfileCard")
         self.setCheckable(True)
         self.setAccessibleName(f"Perfil {label}")
         self.setAccessibleDescription(description)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(64)
-        self._label_text = label
-        self._description_text = description
-        self.setText(f"{label}\n{description}")
+        self.setMinimumHeight(140)
+        self.setText("")  # we draw children manually
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.XS)
+
+        # Top row: icon + check badge
+        top = QHBoxLayout()
+        top.setContentsMargins(0, 0, 0, 0)
+        top.setSpacing(0)
+
+        icon_lbl = QLabel(PROFILE_ICONS.get(key, "•"))
+        icon_lbl.setStyleSheet(
+            f"color:{accent};font-size:24px;font-weight:800;background:transparent;"
+        )
+        icon_lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        top.addWidget(icon_lbl, 0)
+        top.addStretch(1)
+
+        self.badge = QLabel("✓")
+        self.badge.setFixedSize(20, 20)
+        self.badge.setAlignment(Qt.AlignCenter)
+        self.badge.setStyleSheet(_badge_qss(accent, False))
+        top.addWidget(self.badge, 0, Qt.AlignTop | Qt.AlignRight)
+        layout.addLayout(top)
+
+        layout.addSpacing(Spacing.SM)
+
+        title_lbl = QLabel(label)
+        title_lbl.setStyleSheet(
+            f"color:{Color.ON_SURFACE};font-size:15px;font-weight:700;background:transparent;"
+        )
+        layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(description)
+        desc_lbl.setStyleSheet(
+            f"color:{Color.MUTED};font-size:11px;background:transparent;"
+        )
+        desc_lbl.setWordWrap(True)
+        layout.addWidget(desc_lbl)
+
+        layout.addStretch(1)
         self._apply_style(False)
 
     def _apply_style(self, selected: bool) -> None:
         self.setStyleSheet(_card_qss(self.accent, selected))
+        self.badge.setStyleSheet(_badge_qss(self.accent, selected))
 
 
 class ProfilePicker(QWidget):
@@ -68,27 +131,26 @@ class ProfilePicker(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(Spacing.SM)
 
-        title = QLabel("Perfil de otimização")
+        title = QLabel("Selecione o perfil")
         title.setStyleSheet(
             f"color:{Color.ON_SURFACE};font-size:18px;font-weight:700;"
-            f"margin-bottom:{Spacing.XS}px;"
         )
         layout.addWidget(title)
 
-        subtitle = QLabel("Escolha um foco. Você pode trocar a qualquer momento.")
-        subtitle.setStyleSheet(f"color:{Color.MUTED};font-size:12px;margin-bottom:{Spacing.SM}px;")
-        subtitle.setWordWrap(True)
-        layout.addWidget(subtitle)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(Spacing.MD)
+        grid.setVerticalSpacing(Spacing.MD)
+        grid.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(grid, 1)
 
-        for key, prof in PROFILES.items():
+        cols = 3
+        for index, (key, prof) in enumerate(PROFILES.items()):
             accent = PROFILE_ACCENTS.get(key, Color.ACCENT)
             card = _ProfileCard(key, prof.label, prof.description, accent, self)
             card.toggled.connect(self._on_card_toggled)
             self._group.addButton(card)
             self._cards[key] = card
-            layout.addWidget(card)
-
-        layout.addStretch(1)
+            grid.addWidget(card, index // cols, index % cols)
 
         # Default selection
         first_key = next(iter(PROFILES.keys()))

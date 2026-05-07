@@ -5,9 +5,12 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence, QResizeEvent, QShortcut
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -19,9 +22,9 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QStatusBar,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -39,8 +42,16 @@ from app.storage import HistoryStore
 from .scan_worker import ScanWorker
 from .start_screen import StartScreen
 from .theme import DARK_QSS, LIGHT_QSS
-from .tokens import Color, Spacing
-from .widgets import category_chip, priority_chip, risk_chip, status_chip
+from .tokens import Color, Rounded, Spacing
+from .widgets import (
+    RecommendationDetailsPanel,
+    SidebarNav,
+    StatCard,
+    category_chip,
+    priority_chip,
+    risk_chip,
+    status_chip,
+)
 
 
 COMPACT_BREAKPOINT = 960
@@ -48,13 +59,24 @@ PAGE_START = 0
 PAGE_RESULTS = 1
 REC_TABLE_COLUMN_WIDTHS = (320, 120, 112, 96, 112, 520)
 
+# Sidebar nav rows
+NAV_DASHBOARD = 0
+NAV_HARDWARE = 1
+NAV_RECOMMENDATIONS = 2
+NAV_BIOS = 3
+NAV_GAMES = 4
+NAV_UPDATES = 5
+NAV_HISTORY = 6
+NAV_SETTINGS = 7
+NAV_ABOUT = 8
+
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("HardwareOptimizer — Local-first MVP")
-        self.resize(1280, 800)
-        self.setMinimumSize(720, 560)
+        self.resize(1480, 880)
+        self.setMinimumSize(900, 620)
 
         self._scan: FullScan | None = None
         self._recommendations = []
@@ -66,7 +88,6 @@ class MainWindow(QMainWindow):
         self._scan_worker: ScanWorker | None = None
         self._last_profile: str | None = None
         self._last_games: list[str] = []
-        self._games_tab_index: int = -1
 
         self._build_ui()
         self._apply_theme()
@@ -97,81 +118,102 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._progress_bar)
         self.statusBar().showMessage("Pronto.")
 
+    # ------------------------------------------------- results view
     def _build_results_view(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        layout.setSpacing(Spacing.MD)
-        layout.addLayout(self._build_top_bar())
+        page.setStyleSheet(f"background-color:{Color.BACKGROUND};")
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        self.tabs = QTabWidget()
-        self.dashboard = QTextEdit(readOnly=True)
-        self.dashboard.setPlainText(
-            "Análise concluída.\n\n"
-            "Use as abas para navegar por hardware, recomendações, BIOS/UEFI, "
-            "jogos, atualizações e histórico. Duplo clique numa recomendação "
-            "abre os detalhes; clique direito permite marcar status."
-        )
-        self.tabs.addTab(self.dashboard, "Dashboard")
+        # Top bar
+        outer.addWidget(self._build_top_bar(), 0)
 
-        self.hardware_text = QTextEdit(readOnly=True)
-        self.tabs.addTab(self.hardware_text, "Hardware")
+        # Body: sidebar + content stack
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
 
-        self.recs_table = self._make_rec_table()
-        self.tabs.addTab(self.recs_table, "Recomendações")
+        self.sidebar = SidebarNav()
+        self.sidebar.add_section("🏠", "Dashboard")
+        self.sidebar.add_section("🖥", "Hardware")
+        self.sidebar.add_section("💡", "Recomendações")
+        self.sidebar.add_section("⚙", "BIOS/UEFI")
+        self.sidebar.add_section("🎮", "Jogos")
+        self.sidebar.add_section("⬇", "Atualizações")
+        self.sidebar.add_section("🕘", "Histórico")
+        self.sidebar.add_section("🔧", "Configurações")
+        self.sidebar.add_section("ℹ", "Sobre")
+        self.sidebar.pageChanged.connect(self._on_nav_changed)
+        body.addWidget(self.sidebar, 0)
 
-        self.bios_table = self._make_rec_table()
-        self.tabs.addTab(self.bios_table, "BIOS / UEFI")
+        self.content_stack = QStackedWidget()
+        self.content_stack.setStyleSheet(f"background-color:{Color.BACKGROUND};")
+        self.content_stack.addWidget(self._build_dashboard_page())  # 0
+        self.content_stack.addWidget(self._build_hardware_page())   # 1
+        self.content_stack.addWidget(self._build_recs_page())       # 2
+        self.content_stack.addWidget(self._build_bios_page())       # 3
+        self.content_stack.addWidget(self._build_games_page())      # 4
+        self.content_stack.addWidget(self._build_updates_page())    # 5
+        self.content_stack.addWidget(self._build_history_page())    # 6
+        self.content_stack.addWidget(self._build_settings_page())   # 7
+        self.content_stack.addWidget(self._build_about_page())      # 8
+        body.addWidget(self.content_stack, 1)
 
-        self.games_table = self._make_rec_table()
-        self._games_tab_index = self.tabs.addTab(self.games_table, "Jogos")
+        outer.addLayout(body, 1)
 
-        self.updates_text = QTextEdit(readOnly=True)
-        self.tabs.addTab(self.updates_text, "Atualizações")
+        # Bottom action bar
+        outer.addWidget(self._build_bottom_bar(), 0)
 
-        self.history_list = QListWidget()
-        self.history_list.itemDoubleClicked.connect(self._on_history_open)
-        self.tabs.addTab(self.history_list, "Histórico")
-        self._refresh_history()
-
-        layout.addWidget(self.tabs, 1)
+        self.sidebar.setCurrentRow(NAV_DASHBOARD)
         return page
 
-    def _build_top_bar(self) -> QHBoxLayout:
-        row = QHBoxLayout()
-        row.setSpacing(Spacing.SM)
-
-        self.back_btn = QPushButton("← Nova análise")
-        self.back_btn.setAccessibleName("Nova análise")
-        self.back_btn.setAccessibleDescription("Volta para a tela inicial sem apagar o histórico salvo.")
-        self.back_btn.setCursor(Qt.PointingHandCursor)
-        self.back_btn.setToolTip("Voltar à tela inicial (Esc)")
-        self.back_btn.clicked.connect(self._go_to_start)
-        row.addWidget(self.back_btn)
-
-        self.profile_label = QLabel("")
-        self.profile_label.setStyleSheet(
-            f"color:{Color.MUTED};font-size:13px;padding-left:{Spacing.MD}px;"
+    def _build_top_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("TopBar")
+        bar.setStyleSheet(
+            f"#TopBar{{background-color:{Color.SURFACE};"
+            f"border-bottom:1px solid {Color.BORDER};}}"
         )
-        row.addWidget(self.profile_label)
+        bar.setFixedHeight(56)
+
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
+        row.setSpacing(Spacing.MD)
+
+        brand = QLabel("HardwareOptimizer")
+        brand.setStyleSheet(
+            f"color:{Color.ON_SURFACE};font-size:16px;font-weight:800;"
+            f"letter-spacing:0.5px;"
+        )
+        row.addWidget(brand)
+
+        # Profile combo
+        self.profile_combo = QComboBox()
+        self.profile_combo.setAccessibleName("Perfil ativo")
+        self.profile_combo.setMinimumWidth(180)
+        for key, prof in PROFILES.items():
+            self.profile_combo.addItem(prof.label, key)
+        self.profile_combo.currentIndexChanged.connect(self._on_profile_combo_changed)
+        self.profile_combo.setStyleSheet(
+            f"QComboBox{{background-color:{Color.SURFACE_ELEVATED};"
+            f"color:{Color.ON_SURFACE};border:1px solid {Color.BORDER};"
+            f"border-radius:{Rounded.SM}px;padding:4px 10px;font-size:13px;}}"
+            f"QComboBox::drop-down{{border:none;}}"
+        )
+        row.addWidget(self.profile_combo)
 
         row.addStretch(1)
 
-        self.export_json_btn = QPushButton("Exportar JSON")
+        self.export_json_btn = QPushButton("{ } Exportar JSON")
         self.export_json_btn.setAccessibleName("Exportar relatório JSON")
-        self.export_json_btn.setAccessibleDescription(
-            "Exporta a última análise em arquivo JSON local."
-        )
         self.export_json_btn.setEnabled(False)
         self.export_json_btn.setToolTip("Exportar relatório em JSON (Ctrl+E)")
         self.export_json_btn.clicked.connect(lambda: self._on_export("json"))
         row.addWidget(self.export_json_btn)
 
-        self.export_html_btn = QPushButton("Exportar HTML")
+        self.export_html_btn = QPushButton("📄 Exportar HTML")
         self.export_html_btn.setAccessibleName("Exportar relatório HTML")
-        self.export_html_btn.setAccessibleDescription(
-            "Exporta a última análise em relatório HTML local."
-        )
         self.export_html_btn.setEnabled(False)
         self.export_html_btn.setToolTip("Exportar relatório em HTML (Ctrl+Shift+E)")
         self.export_html_btn.clicked.connect(lambda: self._on_export("html"))
@@ -179,13 +221,219 @@ class MainWindow(QMainWindow):
 
         self.theme_btn = QToolButton()
         self.theme_btn.setAccessibleName("Alternar tema")
-        self.theme_btn.setAccessibleDescription("Alterna entre tema claro e escuro.")
         self.theme_btn.setText("☀")
         self.theme_btn.setToolTip("Alternar tema claro/escuro (Ctrl+T)")
         self.theme_btn.clicked.connect(self._toggle_theme)
         row.addWidget(self.theme_btn)
-        return row
+        return bar
 
+    def _build_bottom_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("BottomBar")
+        bar.setStyleSheet(
+            f"#BottomBar{{background-color:{Color.SURFACE};"
+            f"border-top:1px solid {Color.BORDER};}}"
+        )
+        bar.setFixedHeight(48)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
+        row.setSpacing(Spacing.MD)
+
+        self.bottom_status = QLabel("Análise concluída.")
+        self.bottom_status.setStyleSheet(
+            f"color:{Color.SUCCESS};font-size:13px;font-weight:600;"
+        )
+        row.addWidget(self.bottom_status)
+
+        self.back_btn = QPushButton("↻ Nova análise")
+        self.back_btn.setAccessibleName("Nova análise")
+        self.back_btn.setCursor(Qt.PointingHandCursor)
+        self.back_btn.setToolTip("Voltar à tela inicial (Esc)")
+        self.back_btn.clicked.connect(self._go_to_start)
+        row.addWidget(self.back_btn)
+
+        row.addStretch(1)
+
+        self.system_info_lbl = QLabel("")
+        self.system_info_lbl.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
+        row.addWidget(self.system_info_lbl)
+
+        return bar
+
+    # ------------------------------------------------- pages
+    def _build_dashboard_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        layout.setSpacing(Spacing.MD)
+
+        # Stat cards row
+        cards = QGridLayout()
+        cards.setHorizontalSpacing(Spacing.MD)
+        cards.setVerticalSpacing(Spacing.MD)
+        self.stat_recs = StatCard("RECOMENDAÇÕES", "0", "0 aplicáveis", "info")
+        self.stat_risk = StatCard("RISCO MAIOR", "—", "Sem dados", "warning")
+        self.stat_updates = StatCard("UPDATES", "0", "0 atualizações disponíveis", "success")
+        self.stat_drivers = StatCard("DRIVERS ANTIGOS", "0", "0 drivers desatualizados", "danger")
+        cards.addWidget(self.stat_recs, 0, 0)
+        cards.addWidget(self.stat_risk, 0, 1)
+        cards.addWidget(self.stat_updates, 0, 2)
+        cards.addWidget(self.stat_drivers, 0, 3)
+        layout.addLayout(cards)
+
+        # Title
+        title = QLabel("Recomendações por prioridade")
+        title.setStyleSheet(
+            f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;"
+        )
+        layout.addWidget(title)
+
+        # Recommendations table
+        self.recs_table = self._make_rec_table()
+        self.recs_table.itemSelectionChanged.connect(self._on_recs_table_selection)
+        layout.addWidget(self.recs_table, 1)
+
+        # Details panel
+        self.details_panel = RecommendationDetailsPanel()
+        layout.addWidget(self.details_panel, 0)
+
+        # BIOS warning banner
+        warn = QFrame()
+        warn.setObjectName("BiosWarn")
+        warn.setStyleSheet(
+            f"#BiosWarn{{background-color:{Color.SURFACE};"
+            f"border:1px solid {Color.WARNING};"
+            f"border-radius:{Rounded.MD}px;}}"
+        )
+        wl = QHBoxLayout(warn)
+        wl.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
+        wl.setSpacing(Spacing.SM)
+        wi = QLabel("⚠")
+        wi.setStyleSheet(
+            f"color:{Color.WARNING};font-size:18px;background:transparent;"
+        )
+        wl.addWidget(wi)
+        wt = QLabel(
+            "<b>BIOS/UEFI: recomendações manuais, sem aplicação automática.</b><br>"
+            f"<span style='color:{Color.MUTED};font-size:12px;'>"
+            "Alterações incorretas podem causar instabilidade. Prossiga com cautela.</span>"
+        )
+        wt.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:13px;background:transparent;")
+        wt.setWordWrap(True)
+        wl.addWidget(wt, 1)
+        layout.addWidget(warn, 0)
+
+        return page
+
+    def _build_hardware_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("Hardware detectado")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        self.hardware_text = QTextEdit(readOnly=True)
+        layout.addWidget(self.hardware_text, 1)
+        return page
+
+    def _build_recs_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("Todas as recomendações")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        self.full_recs_table = self._make_rec_table()
+        layout.addWidget(self.full_recs_table, 1)
+        return page
+
+    def _build_bios_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("BIOS / UEFI")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        self.bios_table = self._make_rec_table()
+        layout.addWidget(self.bios_table, 1)
+        return page
+
+    def _build_games_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        self.games_title = QLabel("Recomendações para jogos")
+        self.games_title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(self.games_title)
+        self.games_table = self._make_rec_table()
+        layout.addWidget(self.games_table, 1)
+        return page
+
+    def _build_updates_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("Atualizações e drivers")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        self.updates_text = QTextEdit(readOnly=True)
+        layout.addWidget(self.updates_text, 1)
+        return page
+
+    def _build_history_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("Histórico de análises")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        self.history_list = QListWidget()
+        self.history_list.itemDoubleClicked.connect(self._on_history_open)
+        layout.addWidget(self.history_list, 1)
+        self._refresh_history()
+        return page
+
+    def _build_settings_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("Configurações")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        info = QLabel(
+            "Configurações são armazenadas localmente em "
+            "%LOCALAPPDATA%\\HardwareOptimizer.\n\n"
+            "• Tema: alterne pelo botão ☀/🌙 no topo (Ctrl+T).\n"
+            "• Histórico: SQLite local em history.sqlite.\n"
+            "• Logs: logs/app.log com rotação 5×1MB.\n"
+            "• Sem telemetria, sem upload, sem nuvem."
+        )
+        info.setStyleSheet(f"color:{Color.MUTED};font-size:13px;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        layout.addStretch(1)
+        return page
+
+    def _build_about_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        title = QLabel("Sobre o HardwareOptimizer")
+        title.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:16px;font-weight:700;")
+        layout.addWidget(title)
+        info = QLabel(
+            "HardwareOptimizer v0.1.0 — análise local de hardware/Windows/BIOS "
+            "com recomendações explicáveis, advisory-first.\n\n"
+            "Nenhuma alteração automática é aplicada. Todas as recomendações "
+            "incluem evidência, risco, confiança, validação e rollback."
+        )
+        info.setStyleSheet(f"color:{Color.MUTED};font-size:13px;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        layout.addStretch(1)
+        return page
+
+    # ------------------------------------------------- table helpers
     def _make_rec_table(self) -> QTableWidget:
         table = QTableWidget(0, 6)
         table.setHorizontalHeaderLabels(
@@ -202,7 +450,7 @@ class MainWindow(QMainWindow):
         table.setSortingEnabled(True)
         table.setWordWrap(False)
         table.verticalHeader().setVisible(False)
-        table.verticalHeader().setDefaultSectionSize(34)
+        table.verticalHeader().setDefaultSectionSize(36)
         self._apply_rec_table_widths(table)
         table.cellDoubleClicked.connect(lambda r, _c, t=table: self._show_rec_details(t, r))
         table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -218,17 +466,15 @@ class MainWindow(QMainWindow):
         self.stack.setAccessibleDescription("Alterna entre tela inicial e resultados da análise.")
         self.results_view.setAccessibleName("Resultados da análise")
         self.results_view.setAccessibleDescription(
-            "Área com dashboard, hardware, recomendações, BIOS, jogos, atualizações e histórico."
+            "Área com sidebar de navegação e dashboard de recomendações."
         )
-        self.tabs.setAccessibleName("Abas de resultados")
-        self.tabs.setAccessibleDescription("Use as abas para navegar pelas seções do diagnóstico.")
-        self.dashboard.setAccessibleName("Dashboard da análise")
-        self.dashboard.setAccessibleDescription("Resumo inicial dos resultados da análise.")
-        self.hardware_text.setAccessibleName("Dados de hardware")
-        self.hardware_text.setAccessibleDescription("Lista dados detectados de sistema, hardware e BIOS.")
         self.recs_table.setAccessibleName("Tabela de recomendações")
         self.recs_table.setAccessibleDescription(
             "Lista recomendações com categoria, prioridade, risco, status e resumo."
+        )
+        self.full_recs_table.setAccessibleName("Tabela completa de recomendações")
+        self.full_recs_table.setAccessibleDescription(
+            "Lista todas as recomendações geradas pela análise."
         )
         self.bios_table.setAccessibleName("Tabela de recomendações de BIOS e UEFI")
         self.bios_table.setAccessibleDescription(
@@ -238,33 +484,47 @@ class MainWindow(QMainWindow):
         self.games_table.setAccessibleDescription(
             "Lista recomendações específicas para jogos selecionados."
         )
+        self.history_list.setAccessibleName("Histórico de análises")
+        self.history_list.setAccessibleDescription(
+            "Lista análises salvas localmente neste computador."
+        )
+        self.hardware_text.setAccessibleName("Dados de hardware")
+        self.hardware_text.setAccessibleDescription(
+            "Lista dados detectados de sistema, hardware e BIOS."
+        )
         self.updates_text.setAccessibleName("Dados de atualizações")
         self.updates_text.setAccessibleDescription(
-            "Mostra atualizações do Windows, fontes oficiais e drivers antigos detectados."
+            "Mostra atualizações do Windows, fontes oficiais e drivers antigos."
         )
-        self.history_list.setAccessibleName("Histórico de análises")
-        self.history_list.setAccessibleDescription("Lista análises salvas localmente neste computador.")
+
+    # ------------------------------------------------- nav
+    def _on_nav_changed(self, row: int) -> None:
+        self.content_stack.setCurrentIndex(row)
+
+    def _on_profile_combo_changed(self, _index: int) -> None:
+        # Apenas atualiza label; perfil real só muda após nova análise.
+        if self._scan and self._last_profile:
+            new_key = self.profile_combo.currentData()
+            if new_key and new_key != self._last_profile:
+                self.statusBar().showMessage(
+                    "Para aplicar o novo perfil, rode uma nova análise."
+                )
 
     # ------------------------------------------------------ shortcuts
     def _wire_shortcuts(self) -> None:
-        # F5 ou Ctrl+R: dispara nova análise (na start screen)
         for seq in ("F5", "Ctrl+R"):
             sc = QShortcut(QKeySequence(seq), self)
             sc.activated.connect(self._shortcut_run_scan)
 
-        # Esc: voltar para start screen
         sc_esc = QShortcut(QKeySequence("Escape"), self)
         sc_esc.activated.connect(self._shortcut_back)
 
-        # Ctrl+T: alternar tema
         sc_theme = QShortcut(QKeySequence("Ctrl+T"), self)
         sc_theme.activated.connect(self._toggle_theme)
 
-        # Ctrl+E: exportar JSON
         sc_export_json = QShortcut(QKeySequence("Ctrl+E"), self)
         sc_export_json.activated.connect(lambda: self._on_export("json") if self._scan else None)
 
-        # Ctrl+Shift+E: exportar HTML
         sc_export_html = QShortcut(QKeySequence("Ctrl+Shift+E"), self)
         sc_export_html.activated.connect(lambda: self._on_export("html") if self._scan else None)
 
@@ -341,9 +601,18 @@ class MainWindow(QMainWindow):
             self._render_dashboard(scan, recs, profile, games)
             self._render_hardware(scan)
             self._render_recommendations(recs, games)
+            self._update_sidebar_badges(scan, recs)
 
             self.export_json_btn.setEnabled(True)
             self.export_html_btn.setEnabled(True)
+
+            # Sync profile combo
+            for i in range(self.profile_combo.count()):
+                if self.profile_combo.itemData(i) == profile:
+                    self.profile_combo.blockSignals(True)
+                    self.profile_combo.setCurrentIndex(i)
+                    self.profile_combo.blockSignals(False)
+                    break
 
             report = build_report_dict(scan, profile, games, recs)
             self._current_scan_id = self._store.save_scan(
@@ -351,15 +620,19 @@ class MainWindow(QMainWindow):
             )
             self._refresh_history()
 
-            profile_label = PROFILES.get(profile).label if profile in PROFILES else profile
-            games_text = f" · jogos: {', '.join(SUPPORTED_GAMES.get(g, g) for g in games)}" if games else ""
-            self.profile_label.setText(f"Perfil: {profile_label}{games_text}")
+            from datetime import datetime
+            now = datetime.now().strftime("%d/%m/%Y %H:%M")
+            self.bottom_status.setText(f"✓ Análise concluída em {now}")
+            self.system_info_lbl.setText(
+                f"Sistema: {scan.system.os_name} · "
+                f"Configuração salva localmente"
+            )
 
             self.statusBar().showMessage(
                 f"Análise concluída. {len(recs)} recomendação(ões). "
                 f"Avisos de coleta: {len(scan.collection_errors)}."
             )
-            self.tabs.setCurrentIndex(0)
+            self.sidebar.setCurrentRow(NAV_DASHBOARD)
             self.stack.setCurrentIndex(PAGE_RESULTS)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Erro ao processar resultado", str(exc))
@@ -378,58 +651,42 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Pronto.")
 
     # ----------------------------------------------------------- rendering
+    def _update_sidebar_badges(self, scan: FullScan, recs) -> None:
+        self.sidebar.update_badge(NAV_UPDATES, "Atualizações", "⬇",
+                                  str(scan.updates.available_windows_updates) or None)
+
     def _render_dashboard(self, scan: FullScan, recs, profile: str, games: list[str]) -> None:
-        profile_label = PROFILES.get(profile).label if profile in PROFILES else profile
-        games_label = ", ".join(SUPPORTED_GAMES.get(g, g) for g in games) if games else "Nenhum"
+        # Stat cards
         risk_rank = {"blocked": 0, "risky": 1, "review": 2, "safe": 3}
+        risk_label_pt = {"safe": "Seguro", "review": "Revisar", "risky": "Risco", "blocked": "Bloqueado"}
+        risk_tone = {"safe": "success", "review": "warning", "risky": "danger", "blocked": "danger"}
         highest_risk = min(recs, key=lambda rec: risk_rank.get(rec.risk.value, 99)) if recs else None
-        safe_next = next((rec for rec in recs if rec.risk.value in {"safe", "review"}), None)
 
-        lines = [
-            "Resumo da análise",
-            "-" * 40,
-            f"Perfil: {profile_label}",
-            f"Jogos selecionados: {games_label}",
-            f"Recomendações encontradas: {len(recs)}",
-            f"Avisos de coleta: {len(scan.collection_errors)}",
-            "",
-            "Maior atenção",
-            "-" * 40,
-        ]
+        self.stat_recs.update_values(str(len(recs)), f"{len(recs)} aplicáveis")
+
         if highest_risk:
-            lines.append(
-                f"{highest_risk.title} [{highest_risk.risk.value} / {highest_risk.priority.value}]"
+            risk_value = highest_risk.risk.value
+            count_at_risk = sum(
+                1 for r in recs if r.risk.value in {"risky", "blocked", "review"}
             )
-            lines.append(highest_risk.expected_benefit)
+            tone = risk_tone.get(risk_value, "warning")
+            label = risk_label_pt.get(risk_value, risk_value)
+            self.stat_risk = self.stat_risk  # keep ref
+            self.stat_risk.update_values(
+                label,
+                f"{count_at_risk} recomend. de alto risco",
+            )
         else:
-            lines.append("Nenhum risco relevante foi gerado pela engine.")
+            self.stat_risk.update_values("—", "Sem dados")
 
-        lines += ["", "Próxima ação segura", "-" * 40]
-        if safe_next:
-            lines.append(f"{safe_next.title} [{safe_next.priority.value}]")
-            lines.append(safe_next.how_to_validate or safe_next.expected_benefit)
-        else:
-            lines.append("Revise as recomendações sensíveis antes de qualquer mudança.")
-
-        lines += ["", "Top 3 prioridades", "-" * 40]
-        if recs:
-            for index, rec in enumerate(recs[:3], 1):
-                lines.append(f"{index}. {rec.title} [{rec.category.value} / {rec.priority.value}]")
-                lines.append(f"   {rec.expected_benefit}")
-        else:
-            lines.append("Nenhuma recomendação gerada.")
-
-        lines += [
-            "",
-            "Sinais rápidos",
-            "-" * 40,
-            f"Updates disponíveis: {scan.updates.available_windows_updates}",
-            f"Reinicialização pendente: {scan.updates.pending_reboot}",
-            f"Drivers antigos detectados: {len(scan.updates.outdated_drivers)}",
-            f"Secure Boot: {scan.bios.secure_boot}",
-            f"Virtualização: {scan.bios.virtualization}",
-        ]
-        self.dashboard.setPlainText("\n".join(lines))
+        updates = scan.updates.available_windows_updates
+        self.stat_updates.update_values(
+            str(updates), f"{updates} atualizações disponíveis"
+        )
+        outdated = len(scan.updates.outdated_drivers)
+        self.stat_drivers.update_values(
+            str(outdated), f"{outdated} drivers desatualizados"
+        )
 
     def _render_hardware(self, scan: FullScan) -> None:
         lines = ["Sistema", "-" * 40]
@@ -538,16 +795,15 @@ class MainWindow(QMainWindow):
         game_recs = [r for r in recs if r.category.value == "games"]
 
         self._fill_table(self.recs_table, recs)
+        self._fill_table(self.full_recs_table, recs)
         self._fill_table(self.bios_table, bios_recs)
         self._fill_table(self.games_table, game_recs)
 
-        if self._games_tab_index >= 0:
-            if not games:
-                self.tabs.setTabText(self._games_tab_index, "Jogos")
-            else:
-                labels = ", ".join(SUPPORTED_GAMES.get(g, g) for g in games)
-                title = f"Jogos ({labels})" if len(labels) <= 30 else f"Jogos ({labels[:30]}…)"
-                self.tabs.setTabText(self._games_tab_index, title)
+        if games:
+            labels = ", ".join(SUPPORTED_GAMES.get(g, g) for g in games)
+            self.games_title.setText(f"Recomendações para jogos — {labels}")
+        else:
+            self.games_title.setText("Recomendações para jogos")
 
     def _fill_table(self, table: QTableWidget, recs) -> None:
         table.setSortingEnabled(False)
@@ -586,7 +842,7 @@ class MainWindow(QMainWindow):
         table.setSortingEnabled(True)
 
     def _refresh_status_cells(self) -> None:
-        for table in (self.recs_table, self.bios_table, self.games_table):
+        for table in (self.recs_table, self.full_recs_table, self.bios_table, self.games_table):
             for row in range(table.rowCount()):
                 title_item = table.item(row, 0)
                 if not title_item:
@@ -599,6 +855,19 @@ class MainWindow(QMainWindow):
                 table.setItem(row, 4, chip)
 
     # ---------------------------------------- recommendation interactions
+    def _on_recs_table_selection(self) -> None:
+        items = self.recs_table.selectedItems()
+        if not items:
+            self.details_panel.clear()
+            return
+        row = items[0].row()
+        first = self.recs_table.item(row, 0)
+        rec = first.data(Qt.UserRole) if first else None
+        if rec is None:
+            self.details_panel.clear()
+            return
+        self.details_panel.show_recommendation(rec, self._status_map.get(rec.title, "pending"))
+
     def _show_rec_details(self, table: QTableWidget, row: int) -> None:
         item = table.item(row, 0)
         if item is None:
@@ -641,6 +910,13 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Erro ao salvar status: {exc}")
                 return
         self._refresh_status_cells()
+        # Refresh details panel if same rec is shown
+        items = self.recs_table.selectedItems()
+        if items:
+            first = self.recs_table.item(items[0].row(), 0)
+            rec = first.data(Qt.UserRole) if first else None
+            if rec and rec.title == title:
+                self.details_panel.show_recommendation(rec, status)
         self.statusBar().showMessage(f"Status atualizado: {title} → {status}")
 
     # ------------------------------------------------------ export & history

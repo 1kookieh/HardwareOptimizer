@@ -1,12 +1,11 @@
-"""Tela inicial: CTA circular animado à esquerda, configuração à direita.
+"""Tela inicial: CTA circular à esquerda, perfis em grid e jogos à direita.
 
 Layout:
-- Coluna esquerda: branding + botão circular + hint + status
-- Coluna direita: ProfilePicker + GamesPanel (slide-down condicional)
-
-A coluna direita tem largura mínima 360px para garantir que o seletor
-de perfil sempre apareça mesmo em janelas estreitas. A esquerda fixa
-em ~340px para dar espaço ao botão sem espremer a direita.
+- Topo esquerdo: branding HardwareOptimizer
+- Centro esquerdo: botão circular "Analisar PC"
+- Topo direito: "Selecione o perfil" + grid 3-col de cards de perfil
+- Logo abaixo: GamesPanel (slide-down quando perfil = jogos)
+- Rodapé: banners "Somente leitura" + "Pronto para análise"
 """
 from __future__ import annotations
 
@@ -20,12 +19,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.ui.tokens import Color, Spacing
+from app.ui.tokens import Color, Rounded, Spacing
 from app.ui.widgets import CircularStartButton, GamesPanel, ProfilePicker
 
 
+def _info_banner_qss(border: str) -> str:
+    return (
+        f"#InfoBanner{{background-color:{Color.SURFACE};"
+        f"border:1px solid {border};border-radius:{Rounded.MD}px;}}"
+    )
+
+
 class StartScreen(QWidget):
-    startRequested = Signal(str, list)  # profile_key, games
+    startRequested = Signal(str, list)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -35,15 +41,34 @@ class StartScreen(QWidget):
         )
         self.setStyleSheet(f"background-color:{Color.BACKGROUND};")
 
-        outer = QHBoxLayout(self)
+        outer = QVBoxLayout(self)
         outer.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-        outer.setSpacing(Spacing.LG)
+        outer.setSpacing(Spacing.MD)
 
-        outer.addWidget(self._build_left(), 0)
-        outer.addWidget(self._build_right(), 1)
+        # Brand on top
+        brand_row = QHBoxLayout()
+        brand_row.setContentsMargins(0, 0, 0, 0)
+        brand_row.setSpacing(Spacing.SM)
+        brand = QLabel("HardwareOptimizer")
+        brand.setStyleSheet(
+            f"color:{Color.ON_SURFACE};font-size:20px;font-weight:800;"
+            f"letter-spacing:0.5px;"
+        )
+        brand_row.addWidget(brand)
+        brand_row.addStretch(1)
+        outer.addLayout(brand_row)
 
-        # Sincroniza GamesPanel com o perfil default (signal só dispara
-        # após esta conexão, então fazemos um nudge manual aqui).
+        # Main content split
+        body = QHBoxLayout()
+        body.setSpacing(Spacing.LG)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.addWidget(self._build_left(), 0)
+        body.addWidget(self._build_right(), 1)
+        outer.addLayout(body, 1)
+
+        # Footer banners
+        outer.addWidget(self._build_footer(), 0)
+
         self._on_profile_changed(self.profile_picker.selected_profile())
 
     # --- left: circular CTA ------------------------------------------------
@@ -58,25 +83,9 @@ class StartScreen(QWidget):
         layout.setSpacing(Spacing.SM)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        brand = QLabel("HardwareOptimizer")
-        brand.setStyleSheet(
-            f"color:{Color.ON_SURFACE};font-size:24px;font-weight:800;"
-            f"letter-spacing:0.5px;"
-        )
-        brand.setAlignment(Qt.AlignCenter)
-        layout.addWidget(brand)
+        layout.addStretch(1)
 
-        tagline = QLabel("Análise local · advisory-first · sem alterações automáticas")
-        tagline.setStyleSheet(f"color:{Color.MUTED};font-size:12px;")
-        tagline.setAlignment(Qt.AlignCenter)
-        tagline.setWordWrap(True)
-        layout.addWidget(tagline)
-
-        layout.addSpacing(Spacing.LG)
-
-        # Container fixo para o botão (mantém centralizado)
         btn_container = QWidget()
-        btn_container.setFixedHeight(320)
         btn_layout = QVBoxLayout(btn_container)
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setAlignment(Qt.AlignCenter)
@@ -86,17 +95,7 @@ class StartScreen(QWidget):
         btn_layout.addWidget(self.start_button, 0, Qt.AlignCenter)
         layout.addWidget(btn_container, 0, Qt.AlignHCenter)
 
-        hint = QLabel("Coleta automática · somente leitura")
-        hint.setStyleSheet(
-            f"color:{Color.ACCENT};font-size:11px;"
-            f"letter-spacing:1.5px;text-transform:uppercase;"
-        )
-        hint.setAlignment(Qt.AlignCenter)
-        layout.addWidget(hint)
-
-        layout.addSpacing(Spacing.SM)
-
-        self.status_label = QLabel("Pronto para iniciar.")
+        self.status_label = QLabel("Iniciar análise completa do sistema")
         self.status_label.setStyleSheet(
             f"color:{Color.MUTED};font-size:13px;font-weight:500;"
         )
@@ -104,13 +103,13 @@ class StartScreen(QWidget):
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
-        layout.addStretch(1)
+        layout.addStretch(2)
         return wrapper
 
     # --- right: profile + games -------------------------------------------
     def _build_right(self) -> QWidget:
         right = QFrame()
-        right.setMinimumWidth(320)
+        right.setMinimumWidth(420)
         right.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         layout = QVBoxLayout(right)
@@ -126,6 +125,61 @@ class StartScreen(QWidget):
 
         layout.addStretch(1)
         return right
+
+    # --- footer: info banners ---------------------------------------------
+    def _build_footer(self) -> QWidget:
+        footer = QWidget()
+        layout = QVBoxLayout(footer)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(Spacing.SM)
+
+        # Read-only banner
+        readonly = QFrame()
+        readonly.setObjectName("InfoBanner")
+        readonly.setStyleSheet(_info_banner_qss(Color.BORDER))
+        ro_l = QHBoxLayout(readonly)
+        ro_l.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
+        ro_l.setSpacing(Spacing.SM)
+        ro_icon = QLabel("🔒")
+        ro_icon.setStyleSheet(f"color:{Color.ACCENT};font-size:16px;background:transparent;")
+        ro_l.addWidget(ro_icon)
+        ro_text = QLabel(
+            "<b>Somente leitura.</b> Nenhuma alteração automática.<br>"
+            "<span style='color:" + Color.MUTED + ";font-size:12px;'>"
+            "O HardwareOptimizer apenas analisa e sugere ajustes. "
+            "Todas as mudanças são manuais.</span>"
+        )
+        ro_text.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:13px;background:transparent;")
+        ro_text.setWordWrap(True)
+        ro_l.addWidget(ro_text, 1)
+        layout.addWidget(readonly)
+
+        # Status banner
+        status = QFrame()
+        status.setObjectName("InfoBanner")
+        status.setStyleSheet(_info_banner_qss(Color.SUCCESS))
+        st_l = QHBoxLayout(status)
+        st_l.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
+        st_l.setSpacing(Spacing.SM)
+        st_icon = QLabel("✓")
+        st_icon.setFixedSize(20, 20)
+        st_icon.setAlignment(Qt.AlignCenter)
+        st_icon.setStyleSheet(
+            f"background-color:{Color.SUCCESS};color:{Color.ON_PRIMARY};"
+            f"border-radius:10px;font-weight:800;font-size:12px;"
+        )
+        st_l.addWidget(st_icon)
+        st_text = QLabel(
+            "<b>Pronto para análise.</b>"
+            "<span style='color:" + Color.MUTED + ";font-size:12px;'>"
+            "  Perfis e recomendações são armazenados localmente neste dispositivo.</span>"
+        )
+        st_text.setStyleSheet(f"color:{Color.ON_SURFACE};font-size:13px;background:transparent;")
+        st_text.setWordWrap(True)
+        st_l.addWidget(st_text, 1)
+        layout.addWidget(status)
+
+        return footer
 
     # --- handlers ----------------------------------------------------------
     def _on_profile_changed(self, key: str) -> None:
@@ -149,4 +203,4 @@ class StartScreen(QWidget):
         self.status_label.setText(text)
 
     def reset_status(self) -> None:
-        self.status_label.setText("Pronto para iniciar.")
+        self.status_label.setText("Iniciar análise completa do sistema")

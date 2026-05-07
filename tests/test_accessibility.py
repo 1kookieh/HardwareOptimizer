@@ -26,7 +26,7 @@ def test_main_window_core_controls_have_accessible_names():
         window.start_screen.profile_picker,
         window.start_screen.games_panel,
         window.stack,
-        window.tabs,
+        window.sidebar,
         window.recs_table,
         window.bios_table,
         window.games_table,
